@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-08 (security testing pass complete)
+Last updated: 2026-09-08 (mobile QA pass complete)
 
 ## Completed
 
@@ -60,6 +60,8 @@ Everything above was exercised **live in-browser** against the local Supabase st
 10. **Duplicate `id="notes"`** after adding a notes field to the expense form — `PropertyEditForm` already used that id on the same page, so `<label htmlFor="notes">` in the new expense form would have focused the wrong field. Caught by inspecting the actual DOM during live verification (a `getElementById` check silently returned the wrong element), fixed by renaming the new field's id to `expenseNotes`.
 11. **Smart capture initially discarded the scanned photo and kept no record of the scan** -- a security-advisor sweep (re-running `get_advisors` on the real project, done as part of starting the security-testing phase) surfaced that the original schema already had `extraction_jobs` and expected the scanned photo to be saved too (`input_attachment_id` referencing `attachments`), neither of which the first version of smart capture used. That's a real product gap for an app whose whole pitch is "remembers everything" -- the original receipt/label photo is exactly the kind of thing worth keeping, e.g. for an insurance claim. Fixed by having both extraction actions upload the photo as a property-level attachment and insert an `extraction_jobs` row (status `completed`/`failed`, confidence, the full parsed result as JSON) on every scan attempt, independent of whether the user ever submits the surrounding asset/expense form. Verified live: a scan abandoned mid-form (asset never saved) still left the photo in the property's Attachments list and a `completed` job row; a deliberately corrupt image produced a `failed` job row. One follow-on bug caught in the same pass: tesseract.js's worker rejects with a plain string, not an `Error`, so the original `err instanceof Error` check silently produced `"Unknown error"` for every real failure -- fixed to handle both shapes.
 12. **Simplification, not a bug**: a photo scanned while creating a brand-new asset attaches at the *property* level, not the asset's, because the asset doesn't have an id yet at scan time. Reattaching it to the asset after creation would need extra plumbing for a marginal benefit, so it was left as a property-level attachment (still fully accessible, just not linked to that specific asset).
+13. **The expense form's Amount/Tax/Date fields were a fixed 3-column grid**, and at a 375px mobile width the Date column was too narrow for a native date input to show its own value -- `2026-09-08` rendered as `2026-09` with the rest clipped off, invisible to the user. Caught in a dedicated mobile-viewport QA pass (this project's first -- everything before this was tested at desktop width), not by chance. Fixed with a responsive grid (`grid-cols-2 sm:grid-cols-3`, Date spanning both columns below Amount/Tax on narrow screens) rather than shrinking text or abbreviating the field.
+14. **A "phantom" React hydration-mismatch warning that took real effort to rule out as a false alarm.** After the fix above, the dev overlay reported a hydration mismatch on that exact div, reproducing across a full dev-server restart, a brand-new browser tab, and clearing the service worker's cache and registration -- normally enough to call something a real bug. It wasn't: fetching the page's raw server HTML and its client JS chunk directly (bypassing React entirely) proved *both* already contained the correct, matching className. The actual cause was Turbopack's **persistent on-disk build cache** (`.next/`, which survives a plain process restart by design, unlike the file-watcher staleness in issue #6 and the route-resolution staleness before the smart-capture work) holding a stale compiled artifact tied to the edited component. Only `rm -rf .next` plus a restart cleared it. Documented in this much detail because this is now the **third** distinct flavor of Turbopack dev-cache staleness this project has hit (see also #6) -- worth trying a full `.next` wipe early next time this happens, rather than re-deriving from scratch that it isn't a code bug.
 
 **Global search** — `src/app/search/page.tsx`. A plain `<form method="get">` (no server action needed for a read) running structured `ilike` queries across properties/assets/records/vendors in parallel, RLS-scoped automatically like every other query in the app. One query layer so a later semantic-search addition is an internal swap (ARCHITECTURE.md). Live-verified: exact and case-insensitive substring matches against a property address and an asset manufacturer, and a genuine no-results case, all against real data.
 
@@ -75,10 +77,12 @@ Note on how that was tested, not a product bug: pressing Enter to submit via the
 
 With this, all items the roadmap flagged as MVP-gating are done: property/space/asset/record data model, attachments, warranties, expenses, reminders, search, QR labels, export, smart capture, and PWA.
 
+**Mobile QA** — the app's first dedicated pass at an actual mobile viewport (375×812) rather than desktop width; the PWA is squarely meant for phone use, so this was overdue. Full flow re-run at mobile width: signup → onboarding → property page (every section: spaces, assets, records, warranties, attachments, expenses, reminders, export) → new-asset form (including the appliance-label scan) → asset detail page (QR label) → search → a real result. Found and fixed one real layout bug (Issue #13) and ran down one very convincing false alarm (Issue #14) rather than either dismissing it or blindly "fixing" already-correct code. Not covered: real touch-gesture testing (swipe, pinch-zoom) or an actual physical device -- this was viewport-size emulation only.
+
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
-2. Broader QA pass and performance optimization -- next up per the roadmap's execution order, now that the MVP feature set and a dedicated security-testing pass are both complete.
+2. Performance optimization -- next up per the roadmap's execution order, now that the MVP feature set, a dedicated security-testing pass, and a mobile QA pass are all complete.
 3. A full script/style-restricting CSP (nonce-based, via `proxy.ts`), if/when there's a stronger reason to invest in it -- deliberately deferred this round, see Security testing above.
 4. Real rate limiting on the OCR endpoint if usage ever justifies the cost of a shared store (Redis/Upstash) -- not solvable for $0 today, see Security testing above.
 5. Extend attachments to records/warranties too (property and asset already covered; the action already supports any owner column).
@@ -86,6 +90,7 @@ With this, all items the roadmap flagged as MVP-gating are done: property/space/
 7. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
 8. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
 9. Marketing site polish, user-facing docs, and CI/CD -- later roadmap phases, not yet started.
+10. Real device/touch testing for the PWA -- this round's mobile QA was viewport-emulation only.
 
 ## Blockers
 

@@ -77,7 +77,7 @@ export function ExpensesSection({
           onResult={handleScanned}
         />
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="space-y-1">
             <label htmlFor="amount" className="text-xs font-medium">
               Amount
@@ -108,7 +108,7 @@ export function ExpensesSection({
               className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
           </div>
-          <div className="space-y-1">
+          <div className="col-span-2 space-y-1 sm:col-span-1">
             <label htmlFor="expenseDate" className="text-xs font-medium">
               Date
             </label>
