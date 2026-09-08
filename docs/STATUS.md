@@ -18,16 +18,22 @@ Last updated: 2026-09-08
 
 ## In progress / next
 
-1. **Blocked on two explicit go/no-go decisions from the user** (both are persistent/shared-state actions this repo's operating rules require confirming individually — see CLAUDE.md's "Operating rules for autonomous work"):
-   - Push these commits to `github.com/hbkdad/propertymemory` (currently local-only, on `main`, no upstream set).
-   - Create a real Supabase project for this product and apply the migration to it (vs. continuing local-only development for now).
-2. Once unblocked: wire up real Supabase Auth (signup/login/logout/reset) using `@supabase/ssr` — note Next.js 16 renamed Middleware to **Proxy** (`proxy.ts`, not `middleware.ts`; exported function is `proxy`, not `middleware`) — this changes the standard Supabase session-refresh snippet's file name/export, not its logic.
-3. Onboarding flow → `create_organization()` + first property.
-4. Core CRUD (properties → units/spaces → assets → records) per the MVP scope in the PRD.
+Both prior go/no-go decisions were approved by the user 2026-09-08: push to GitHub (now and after each future milestone, without asking again each time) and create the real Supabase project. Both are done — see Completed above.
+
+1. Wire up real Supabase Auth (signup/login/logout/reset) using `@supabase/ssr`, against the real project (`qwotvzwzwurvzdqzaknh`, `.env.local`, not committed). Confirmed via Supabase's docs search: current env var convention is `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (the newer `sb_publishable_...` key format, not the legacy anon JWT). Note Next.js 16 renamed Middleware to **Proxy** (`proxy.ts`, not `middleware.ts`; exported function is `proxy`, not `middleware`) — this changes the standard Supabase session-refresh snippet's file name/export, not its logic.
+2. Onboarding flow → `create_organization()` + first property.
+3. Core CRUD (properties → units/spaces → assets → records) per the MVP scope in the PRD.
 
 ## Blockers
 
-None technical. Two explicit go/no-go decisions pending from the user (see above) before anything is pushed or any cloud resource is created.
+None.
+
+## Real Supabase project
+
+- Project ref: `qwotvzwzwurvzdqzaknh`, name `property-memory`, org `HBK Customs` (`jecllmvbkiwhorczibxt`), region `ca-central-1`, $0/month (confirmed via `get_cost` before creation).
+- Both migrations applied and verified via `get_advisors` + `list_tables`: 20 tables, all RLS-enabled, seed counts correct (10 record types, 12 asset categories).
+- Security-advisor finding fixed same-session, before any real data existed: `is_org_member`/`is_org_admin`/`create_organization` were still callable by the unauthenticated `anon` role after the original migration's `revoke ... from public` — that revoke targeted the wrong grantee, since Supabase grants EXECUTE directly to `anon`/`authenticated`, not through `public`. Fixed in `supabase/migrations/20260908000100_security_hardening.sql` (revoke from `anon` explicitly) and re-verified clean. `create_organization`'s actual exploitability was already zero thanks to its own `auth.uid() is null` guard — a real example of why the defense-in-depth rule in CLAUDE.md/ADR 0002 (grant-level AND function-level checks) matters in practice, not just in theory.
+- One advisory finding left open, deliberately deferred rather than rushed: `pg_trgm` extension installed in the `public` schema (Supabase recommends a dedicated `extensions` schema). Low real risk (namespace hygiene, not a data-exposure issue); moving it now would mean dropping and recreating 8 trigram indexes. Tracked here for a deliberate follow-up rather than done under time pressure.
 
 ## Decisions log
 

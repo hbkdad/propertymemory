@@ -119,5 +119,7 @@ Assume a $0 infrastructure budget indefinitely.
 ## Operating rules for autonomous work in this repo
 
 - Local, reversible work (writing files, running local builds/tests, designing schema, testing migrations against a local/disposable Postgres) proceeds without asking.
-- These specific actions always get an explicit go-ahead in chat first, scoped to that action only: pushing commits to the GitHub remote, creating or modifying any cloud resource (Supabase project, Vercel project, custom domain), enabling a paid tier/service, and anything touching real user data.
+- **Pushing to `github.com/hbkdad/propertymemory` is pre-approved, standing**: the user approved this 2026-09-08 ("push now, and going forward") specifically so it doesn't need to be re-asked after every milestone. This covers ordinary `git push` of commits on `main` only — it does NOT cover force-push, history rewrite, or pushing to any other remote/branch with different semantics; those still require asking, per the general git safety rules above.
+- The real Supabase project (`qwotvzwzwurvzdqzaknh`, see `docs/STATUS.md`) and its migrations are similarly already approved and in use. Creating any *additional* or *different* cloud resource (a second Supabase project, a Vercel project, a custom domain, enabling a paid tier/service) still gets an explicit go-ahead in chat first, scoped to that specific action — the earlier approval was for this one project, not a blanket standing approval for cloud-resource creation in general.
+- Anything touching real user data always gets an explicit go-ahead first.
 - After each significant milestone, update `docs/STATUS.md` (completed / in progress / next / blockers / decisions / test status) instead of relying on conversation memory.
