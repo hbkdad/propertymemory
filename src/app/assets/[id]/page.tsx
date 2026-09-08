@@ -6,6 +6,7 @@ import { updateAsset } from "@/lib/actions/assets";
 import { AssetForm } from "@/components/asset-form";
 import { AttachmentsSection } from "@/components/attachments-section";
 import { WarrantiesSection } from "@/components/warranties-section";
+import { assetUrl, generateQrSvg } from "@/lib/qr";
 import { AssetDeleteButton } from "./asset-delete-button";
 
 export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) {
@@ -40,6 +41,8 @@ export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) 
 
   const updateWithIds = updateAsset.bind(null, asset.id, asset.property_id);
   const redirectPath = `/assets/${asset.id}`;
+  const url = await assetUrl(asset.id);
+  const qrSvg = await generateQrSvg(url);
 
   return (
     <div className="mx-auto w-full max-w-md px-6 py-12">
@@ -70,6 +73,21 @@ export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) 
         assetId={asset.id}
         warranties={warranties ?? []}
       />
+
+      <section className="mt-10">
+        <h2 className="text-lg font-semibold">QR label</h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          Scan to open this asset&apos;s page. Print a label to stick on the appliance itself.
+        </p>
+        <div
+          className="mt-3 w-fit rounded-md bg-white p-2"
+          dangerouslySetInnerHTML={{ __html: qrSvg }}
+        />
+        <p className="mt-2 break-all text-xs text-zinc-500">{url}</p>
+        <Link href={`/assets/${asset.id}/label`} className="mt-2 inline-block text-sm underline">
+          Print label
+        </Link>
+      </section>
     </div>
   );
 }

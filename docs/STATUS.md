@@ -45,10 +45,12 @@ Everything above was exercised **live in-browser** against the local Supabase st
 
 Note on how that was tested, not a product bug: pressing Enter to submit via the browser-automation tool's synthetic keyboard events didn't trigger the native single-input-form-submits-on-Enter behavior, which real browsers gate to trusted user-generated keystrokes. Diagnosed with direct JS inspection (`input.value`, `window.location.href`) rather than assumed, confirmed not a bug, then added a visible Search submit button anyway since that's better UX/accessibility regardless of the testing wrinkle -- verified the real functionality through that button instead.
 
+**QR asset identifiers** — `src/lib/qr.ts` (the `qrcode` package), a QR + plain-text URL on the asset page, and a dedicated printable label at `/assets/[id]/label` (`print-button.tsx` client island calling `window.print()`, `print:hidden` on the button so it doesn't appear in the printed output). No separate opaque public ID was needed -- asset primary keys are already random UUIDs (ADR/architecture decision), so the QR just encodes the normal authenticated asset URL. The origin is reconstructed from the `Host` header + `x-forwarded-proto` (a plain page GET carries no `Origin` header, unlike a Server Action POST -- verified this distinction rather than assuming the same helper would work in both places). Live-verified: the visible plain-text URL next to the QR matched the actual current asset's URL exactly; the QR itself renders with correct finder-pattern structure (not corrupt output); the Print button was confirmed to genuinely invoke the browser's native print dialog.
+
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
-2. QR asset identifiers, PDF/CSV export, smart capture, PWA — the remaining MVP-gate items.
+2. PDF/CSV export, smart capture, PWA — the remaining MVP-gate items.
 3. Extend attachments to records/warranties too (property and asset already covered; the action already supports any owner column).
 4. A dashboard widget surfacing expiring warranties / upcoming reminders across all of a user's properties (currently per-property view only).
 5. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
