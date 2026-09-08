@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-08 (PWA added, then a schema gap in smart capture closed — MVP feature set now complete)
+Last updated: 2026-09-08 (security testing pass complete)
 
 ## Completed
 
@@ -30,7 +30,17 @@ Last updated: 2026-09-08 (PWA added, then a schema gap in smart capture closed �
 
 **PWA** — `src/app/manifest.ts` (installable, `display: "standalone"`, name/description pulled from `branding.ts`), code-generated icons via `next/og`'s `ImageResponse` (`scripts/generate-icons.mjs`, `pnpm generate-icons` -- a plain house glyph, no brand text, so it never goes stale on a rename per ADR 0003), `app/icon.png`/`app/apple-icon.png` (Next's native favicon/apple-touch-icon file convention) plus `public/icon-{192,512}.png` for the manifest. A hand-written `public/sw.js` (no third-party PWA library) does cache-first for hashed static assets and network-first-with-cache-fallback for page navigations, falling back further to `/offline` for a page never visited before; registered from a small client component in the root layout. Removed the stale default create-next-app `favicon.ico` and unused scaffold SVGs from `public/` while touching this area, since the old favicon would otherwise compete with the new one.
 
-**Testing** — Vitest + RTL configured (`pnpm test`), 15 passing unit tests (validation schemas + `advanceDueDate` date arithmetic). `pnpm build` clean throughout. Playwright not yet set up. `src/lib/supabase/database.types.ts` generated from the real schema (regenerate via the Supabase MCP connector after schema changes).
+**Testing** — Vitest + RTL configured (`pnpm test`), 23 passing unit tests (validation schemas, `advanceDueDate` date arithmetic, and the OCR text-parsing regexes). `pnpm build` clean throughout. Playwright not yet set up. `src/lib/supabase/database.types.ts` generated from the real schema (regenerate via the Supabase MCP connector after schema changes).
+
+**Security testing** — a dedicated pass, not just incidental hardening along the way:
+1. Re-ran Supabase's security/performance advisors on the real project. Closed the one real finding (`pg_trgm` living in `public` instead of a dedicated `extensions` schema -- `supabase/migrations/20260908000200_extensions_schema.sql`, verified the existing trigram indexes still resolve their operator class correctly afterward since that's bound by OID, not by schema lookup at query time). The remaining WARN (`is_org_member`/`is_org_admin`/`create_organization` are `SECURITY DEFINER` functions callable by any authenticated user) was traced into the actual function bodies -- both are hard-scoped to `auth.uid()`, never a caller-supplied user id, so calling either only ever answers "am *I* a member of this org"; `anon` execute was already revoked in the earlier hardening migration. Confirmed intentional, not fixed further.
+2. Expanded [supabase/tests/rls_smoke_test.sql](../supabase/tests/rls_smoke_test.sql) beyond `properties` to also cover `assets` and `extraction_jobs`, and beyond SELECT to INSERT/UPDATE/DELETE: as a second tenant, tried to read another org's rows (zero rows back), insert into it by guessing its id (RLS error), and update/delete a specific row by its known id (`UPDATE 0`/`DELETE 0` -- correctly filtered out, not merely blocked after the fact). Full output re-verified against a fresh local reset.
+3. Live app-level IDOR check with two real signed-up users: as User B, hit User A's property page, User A's asset page, and all four of User A's export routes (3 CSV + the PDF) directly by their real UUIDs. Every single one returned a clean 404 with zero data in the body -- confirmed by reading the actual response bodies via `fetch()`, not just the status code.
+4. Verified the actual data-access architecture rather than just testing individual endpoints: every server-side Supabase client (`src/lib/supabase/server.ts`) is built from the publishable key plus the caller's session cookies, never the service-role key -- grepped the whole `src/` tree to confirm no service-role reference exists anywhere client-reachable, so there's no code path that could bypass RLS even by mistake.
+5. Traced (not just grepped) the app's two `dangerouslySetInnerHTML` usages (the QR code SVGs on the asset and label pages) into the `qrcode` package's own SVG renderer: it builds the output purely from numeric path coordinates describing the QR module grid and never writes the encoded URL as literal text into the markup, so there's no XSS path even in principle, regardless of what the URL contains.
+6. Grepped for raw SQL string-building (none -- the one RPC call uses `.rpc()`, matching the documented calling convention) and for hardcoded secrets (none).
+7. Added baseline security headers via `next.config.ts` (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a restrictive `Permissions-Policy`, and `frame-ancestors 'none'`), verified live via `fetch()` that they're actually present on responses. Deliberately did **not** add a full script/style-restricting CSP -- doing that correctly needs nonces threaded through `proxy.ts` and forces every currently-statically-optimized page into dynamic rendering, a real cost for marginal benefit given there's no third-party script and no unsafe-HTML path already found. Documented as a deferred, reasoned decision, not an oversight.
+8. Rate limiting / abuse protection on the OCR endpoint specifically was **not** solved -- it's real server compute, gated only by auth and the existing 10MB/JPEG-or-PNG input caps. Proper rate limiting needs a shared store (Redis/Upstash), which conflicts with the zero-capital constraint. Documented honestly as an accepted risk rather than faked with per-instance in-memory limiting that wouldn't actually work across serverless invocations.
 
 ## Verified
 
@@ -68,12 +78,14 @@ With this, all items the roadmap flagged as MVP-gating are done: property/space/
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
-2. Security testing / QA pass and performance optimization -- next up per the roadmap's execution order, now that the MVP feature set is complete.
-3. Extend attachments to records/warranties too (property and asset already covered; the action already supports any owner column).
-4. A dashboard widget surfacing expiring warranties / upcoming reminders across all of a user's properties (currently per-property view only).
-5. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
-6. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
-7. Marketing site polish, user-facing docs, and CI/CD -- later roadmap phases, not yet started.
+2. Broader QA pass and performance optimization -- next up per the roadmap's execution order, now that the MVP feature set and a dedicated security-testing pass are both complete.
+3. A full script/style-restricting CSP (nonce-based, via `proxy.ts`), if/when there's a stronger reason to invest in it -- deliberately deferred this round, see Security testing above.
+4. Real rate limiting on the OCR endpoint if usage ever justifies the cost of a shared store (Redis/Upstash) -- not solvable for $0 today, see Security testing above.
+5. Extend attachments to records/warranties too (property and asset already covered; the action already supports any owner column).
+6. A dashboard widget surfacing expiring warranties / upcoming reminders across all of a user's properties (currently per-property view only).
+7. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
+8. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
+9. Marketing site polish, user-facing docs, and CI/CD -- later roadmap phases, not yet started.
 
 ## Blockers
 
@@ -87,5 +99,7 @@ See [docs/decisions/](decisions/) for full ADRs (0001 stack, 0002 RLS multi-tena
 
 - `pnpm build`: passing (both Turbopack `next dev` and a real `next build` + `next start` checked for the OCR feature specifically, see Issues #9).
 - `pnpm test` (Vitest): 23/23 passing.
-- RLS cross-tenant isolation: passing (manual script, see `supabase/tests/`).
+- RLS cross-tenant isolation: passing -- SELECT/INSERT/UPDATE/DELETE across `properties`, `assets`, `extraction_jobs` (manual script, see `supabase/tests/`) plus a live two-user app-level IDOR check (property page, asset page, all 4 export routes).
+- Supabase security advisors: one real finding closed (`pg_trgm` schema placement); the remaining WARN confirmed intentional by reading the function bodies, not just re-running the tool.
+- Security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors`): present on live responses, confirmed via `fetch()`.
 - Full auth + onboarding + property data model (spaces/assets/records/attachments/warranties/expenses/reminders): live-verified in-browser, see above.
