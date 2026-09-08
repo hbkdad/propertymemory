@@ -27,6 +27,9 @@ export default async function DashboardPage() {
           <Link href="/search" className="text-sm underline text-zinc-600 dark:text-zinc-400">
             Search
           </Link>
+          <Link href="/help" className="text-sm underline text-zinc-600 dark:text-zinc-400">
+            Help
+          </Link>
           <form action={logOut}>
             <button type="submit" className="text-sm underline text-zinc-600 dark:text-zinc-400">
               Log out

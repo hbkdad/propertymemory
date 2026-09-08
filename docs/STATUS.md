@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-08 (marketing homepage + CI added)
+Last updated: 2026-09-08 (docs added — marketing site, CI, and docs phase all complete)
 
 ## Completed
 
@@ -93,10 +93,14 @@ With this, all items the roadmap flagged as MVP-gating are done: property/space/
 
 Building this surfaced a new, distinct flavor of Turbopack dev-mode staleness (Issue #15) -- worth reading if this happens again, since the fix this time was different from issues #6/#8/#14.
 
+**Docs** — a root [README.md](../README.md) (previously missing entirely): what the project is, the stack, and how to actually run it locally, pointing into `docs/` rather than duplicating it. An in-app `/help` page for end users (linked from the dashboard nav) covering the questions a new user would actually have -- what this is, how scanning works and why it's review-first, who can see your data, how to export, offline behavior, cost -- in the same plain tone as the rest of the app, not corporate FAQ copy. Live-verified: the dashboard's new Help link navigates to a fully-rendered page with no console errors.
+
+With docs done, every item from "marketing site → docs → CI/CD" in the roadmap's execution order is complete.
+
 ## Next
 
-1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
-2. **User-facing docs** -- the one remaining item from this stretch of the roadmap (marketing site and CI are both now done).
+1. **Release assessment** -- the last phase in the roadmap's execution order, now that the MVP feature set, security testing, QA, performance, and marketing/docs/CI are all done. An honest go/no-go pass: what's genuinely launch-ready, what's a known gap, what's explicitly out of scope.
+2. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
 3. Promoting `rls_smoke_test.sql` from a manual script into the CI workflow itself -- needs the local Supabase stack spun up inside the GitHub Actions runner (the CLI supports this, but it's a heavier, separate piece of work from the build/test job added this round) and ideally rewriting its `\echo`-commented expectations into real programmatic assertions that fail the run on a mismatch, not just print for a human to read.
 4. A full script/style-restricting CSP (nonce-based, via `proxy.ts`), if/when there's a stronger reason to invest in it -- deliberately deferred, see Security testing above.
 5. Real rate limiting on the OCR endpoint if usage ever justifies the cost of a shared store (Redis/Upstash) -- not solvable for $0 today, see Security testing above.
