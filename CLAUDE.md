@@ -1,6 +1,12 @@
 # CLAUDE.md — Engineering Constitution for Property Memory (working title)
 
+@AGENTS.md
+
 This file governs how work is done in this repository. It applies to every session, human or agent. When in doubt, this file wins over convenience.
+
+## Framework version warning — read before writing Next.js-specific code
+
+This project scaffolded on **Next.js 16 / React 19.2 / TypeScript 5.9 / Tailwind 4**, all materially newer than most training data for any model working in this repo, and Next.js itself ships a warning to that effect (see `AGENTS.md`, imported above, which Next.js regenerates on every `next dev`/build — keep it committed). Before writing App Router routes, server actions, data fetching, config, or middleware, check `node_modules/next/dist/docs/` for the current API rather than relying on remembered conventions from an older Next.js version. The same caution applies to Tailwind v4 (CSS-first config, no `tailwind.config.js` by default) and any other dependency where the installed major version is newer than what's assumed by habit.
 
 ## Product purpose
 
