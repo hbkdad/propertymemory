@@ -41,11 +41,16 @@ One more real issue found and fixed via live testing: a freshly-added nested dyn
 
 - **Records** (the flexible timeline entity, ADR 0005): `src/app/properties/[id]/records-section.tsx`, `src/lib/actions/records.ts`. A single "Attached to" selector (not two dropdowns) maps to `space_id` XOR `asset_id` server-side (`parseScope` in `src/lib/validations/record.ts`), matching the DB's `records_single_scope` check constraint by construction rather than by hoping the client behaves. Live-verified: added a space, added a record scoped to it with a cost, confirmed the raw row (`space_id` set, `asset_id` null) and the joined display (type/space/cost labels all correct via one embedded Supabase query), then deleted it.
 
+## Completed (continued)
+
+- **Attachments** (Supabase Storage), currently wired to assets (`src/components/attachments-section.tsx`, `src/lib/actions/attachments.ts`, `src/lib/validations/attachment.ts`; reusable for property/record/warranty attachments later via the same `ownerColumn` parameter). Upload happens inside a server action (file arrives via native FormData support for File objects), validated against a MIME allow-list and the 25MB cap *before* anything touches Storage; `next.config.ts` raises the server action body-size limit to 26MB to accommodate it (default is 1MB). Viewing uses short-lived (5 min) signed URLs generated server-side per page load, since the bucket is private.
+- Live-verified thoroughly, including failure paths, not just the happy path: uploaded a real file (confirmed the exact bytes landed in `storage.objects` with correct metadata, and the `attachments` row had the right owner column set and nothing else); opened the signed URL directly and confirmed the browser decoded it as a real 1×1 PNG; deleted it and confirmed both the storage object and DB row were gone (no orphans either direction); attempted to upload a disallowed file type (`text/plain`) and confirmed the server action rejected it with the expected message and nothing was persisted anywhere. File input automation used a DOM-level `DataTransfer`/`File` construction (the standard technique for scripting file inputs, which browsers don't allow via plain `.value` assignment) — this exercised the real server-side validation path, not just the `accept` attribute's picker-level hint.
+
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match what's in `supabase/config.toml`/`supabase/templates/` — there's no MCP tool for this, and it can't be verified until there's a real domain. Do this deliberately, don't assume the hosted defaults already match.
-2. Attachments (Supabase Storage upload flow — the bucket + policy already exist) — the natural next step, since records/assets/warranties all want to hang a photo or receipt off of them.
-3. Warranties, expenses, reminders, global search, QR, export, smart capture — per the roadmap, in that rough order of MVP dependency.
+2. Warranties, expenses, reminders, global search, QR, export, smart capture — per the roadmap, in that rough order of MVP dependency.
+3. Extend attachments UI to properties/records/warranties (the action already supports any owner column).
 4. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
 5. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
 
