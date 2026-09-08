@@ -4,43 +4,51 @@ Last updated: 2026-09-08
 
 ## Completed
 
-- **Phase 0** (environment/capability audit): [docs/CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md), [docs/TOOLS.md](TOOLS.md). Supabase and Vercel MCP connectors both confirmed authenticated; no existing cloud project for this product yet (5 unrelated projects exist under the same Supabase account, all paused).
-- **Phase 1** (governance): [CLAUDE.md](../CLAUDE.md) — engineering constitution, including a hard warning that this repo runs Next.js 16 / React 19.2 / TypeScript 5.9 / Tailwind 4, versions newer than most training data, with instructions to check `node_modules/next/dist/docs/` before writing framework-specific code.
+- **Phase 0** (environment/capability audit): [docs/CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md), [docs/TOOLS.md](TOOLS.md).
+- **Phase 1** (governance): [CLAUDE.md](../CLAUDE.md) — engineering constitution, including a hard warning that this repo runs Next.js 16 / React 19.2 / TypeScript 5.9 / Tailwind 4 and to check `node_modules/next/dist/docs/` before writing framework-specific code (this mattered in practice — see below).
 - **Phase 2** (product requirements): [docs/product/PRD.md](product/PRD.md), [docs/PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md).
-- **Phase 3** (architecture slice): [docs/architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) and ADRs 0001–0005 in [docs/decisions/](decisions/).
-- **Database schema, verified**: [supabase/migrations/20260908000000_init_schema.sql](../supabase/migrations/20260908000000_init_schema.sql) — 20 tables, RLS enabled and policied on every one, a storage bucket + policy for attachments, seed data for record types and asset categories. Verified against a local, disposable Postgres (Docker, via `supabase start`/`db reset`, run three times clean):
-  - All 20 tables confirmed present with `relrowsecurity = true`.
-  - Seed counts confirmed (10 record types, 12 asset categories).
-  - Cross-tenant isolation smoke-tested end to end with two simulated users — see [supabase/tests/rls_smoke_test.sql](../supabase/tests/rls_smoke_test.sql) and [docs/testing/README.md](testing/README.md): User B cannot see User A's organization or property, cannot read it by guessing its id, and a direct malicious insert into User A's organization is rejected by RLS.
-  - One non-issue found and documented: calling `create_organization()` via dot-notation (`select (create_organization(x)).id`) double-invokes it; the normal calling form (`select * from ...`, same as Supabase's `.rpc()`) does not. Commented in the migration.
-- **Next.js app scaffold**: Next.js 16.3.4 / React 19.2.8 / TypeScript 5.9.3 / Tailwind 4.3.3, App Router, pnpm. `pnpm build` passes. Branding centralized in [src/lib/branding.ts](../src/lib/branding.ts) per ADR 0003; the default create-next-app landing page has been replaced with a minimal placeholder using it. Local dev/build verified; not yet visually checked in a browser across breakpoints (no real UI exists yet to check).
-- Local Supabase dev stack runs on a remapped port block (55321–55329) because this machine already runs another project's (`astrasequence`) local stack on the default Supabase ports — see `supabase/config.toml`.
+- **Phase 3** (architecture): [docs/architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) and ADRs 0001–0005 in [docs/decisions/](decisions/).
+- **Database schema**: [supabase/migrations/](../supabase/migrations/) — 20 tables, RLS on every one, storage bucket policy, seed data. Verified locally (Docker) and on the real project via `get_advisors`; one gap found and fixed same-session (see Security below).
+- **Real Supabase project**: `property-memory` (`qwotvzwzwurvzdqzaknh`), org "HBK Customs", ca-central-1, $0/month. Both migrations applied.
+- **Next.js app scaffold**: Next.js 16.3.4 / React 19.2.8 / TypeScript 5.9.3 / Tailwind 4.3.3. Branding centralized in `src/lib/branding.ts` (ADR 0003).
+- **Authentication, fully built and live-verified**: signup, login, logout, forgot/reset password, email confirmation — `src/lib/actions/auth.ts`, `src/app/{login,signup,forgot-password,reset-password,error}/`, `src/app/auth/confirm/route.ts`, `src/lib/supabase/{client,server,proxy}.ts`, `src/proxy.ts` (Next 16 renamed Middleware → Proxy), `src/lib/dal.ts` (session/membership helpers using `getClaims()`, the current-recommended validation call).
+- **Onboarding**: `src/app/onboarding/` + `src/lib/actions/onboarding.ts` — calls the `create_organization()` RPC (via the safe `.rpc()` calling form, not raw SQL) and creates the first property in one flow.
+- **Properties CRUD**: `src/app/properties/{new,[id]}/`, `src/lib/actions/properties.ts`, dashboard list at `src/app/dashboard/`. Create/read/update/delete all live-verified.
+- **Testing infra**: Vitest + React Testing Library configured (`vitest.config.mts`, `pnpm test`); 11 passing unit tests for the Zod validation schemas. Playwright not yet set up (tracked in Next).
+- **TypeScript types** generated from the real schema: `src/lib/supabase/database.types.ts` (regenerate via the Supabase MCP connector after any schema change).
 
-## In progress / next
+## Verified (live, in-browser, against the local Supabase stack with Mailpit catching real emails)
 
-Both prior go/no-go decisions were approved by the user 2026-09-08: push to GitHub (now and after each future milestone, without asking again each time) and create the real Supabase project. Both are done — see Completed above.
+Full loop, no gaps: signup → onboarding (org + first property created) → dashboard → logout → login → forgot-password → real email received → `/auth/confirm` → password actually changed → login with new password → add property → edit property → delete property. Also verified: `pnpm build`, `pnpm test`, and the RLS cross-tenant isolation suite (`supabase/tests/rls_smoke_test.sql`).
 
-1. Wire up real Supabase Auth (signup/login/logout/reset) using `@supabase/ssr`, against the real project (`qwotvzwzwurvzdqzaknh`, `.env.local`, not committed). Confirmed via Supabase's docs search: current env var convention is `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (the newer `sb_publishable_...` key format, not the legacy anon JWT). Note Next.js 16 renamed Middleware to **Proxy** (`proxy.ts`, not `middleware.ts`; exported function is `proxy`, not `middleware`) — this changes the standard Supabase session-refresh snippet's file name/export, not its logic.
-2. Onboarding flow → `create_organization()` + first property.
-3. Core CRUD (properties → units/spaces → assets → records) per the MVP scope in the PRD.
+## Issues found and fixed this session (not swept under the rug)
+
+1. **`anon` could still call privileged RPCs** after the initial migration (wrong grantee revoked). Fixed in `20260908000100_security_hardening.sql`, re-verified via `get_advisors`. `create_organization` was never actually exploitable due to its own `auth.uid()` check — a real instance of defense-in-depth paying off.
+2. **Local Supabase's default email templates link to Auth's own `/auth/v1/verify` endpoint, not to the app.** This silently broke the documented `/auth/confirm` route pattern (confirmed by testing: the redirect dropped our path and query entirely). Fixed by customizing `confirmation`/`recovery` templates (`supabase/templates/`) to link directly to `{{ .RedirectTo }}/auth/confirm?token_hash=...`, per Supabase's own "Email templates when using redirectTo" doc. **This has not been confirmed on the real hosted project** — its default template may or may not already be correct; if signup confirmation or password reset misbehaves after deployment, check this first (see Next).
+3. **Local dev port conflicts**: this machine runs another of the user's projects' (`astrasequence`) local Supabase stack on the default ports, and Chrome/another app on 3000. Local Supabase remapped to 55321-55329 (`supabase/config.toml`); the app's dev server pinned to a fixed port 3010 (`.claude/launch.json`, autoPort disabled) — needed because Supabase Auth only allows *exact* redirect URLs, not wildcards, so a randomly auto-assigned port silently broke email-link redirects.
+4. **Nested `<form>` elements** in the property edit page (delete confirmation form inside the update form) — invalid HTML, caused a React hydration error, caught by live browser testing (not by `pnpm build`, which doesn't check HTML nesting). Fixed by making the delete form a sibling and linking the "Save changes" button back to the update form via the HTML `form` attribute.
+5. **A native `window.confirm()` for delete silently no-op'd** in the automated browser testing context — replaced with a proper in-page two-step confirmation, which is also better UX/accessibility and doesn't depend on browser-specific dialog behavior.
+6. Two Supabase local-stack Docker networking flakes (a stale DNS resolution after restarting a single container out of sync with the rest of the stack) — resolved both times with a full `supabase stop && supabase start`, not by working around them. Not a code issue.
+
+## Next
+
+1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match what's in `supabase/config.toml`/`supabase/templates/` — there's no MCP tool for this, and it can't be verified until there's a real domain. Do this deliberately, don't assume the hosted defaults already match.
+2. Units/spaces/assets/records — the rest of the entity hierarchy per the PRD, following the same pattern as properties (Zod schema → server actions → pages, RLS already in place from the initial migration).
+3. Attachments (Supabase Storage upload flow — the bucket + policy already exist).
+4. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
+5. Warranties, expenses, reminders, global search, QR, export, smart capture — per the roadmap, in that rough order of MVP dependency.
 
 ## Blockers
 
 None.
 
-## Real Supabase project
-
-- Project ref: `qwotvzwzwurvzdqzaknh`, name `property-memory`, org `HBK Customs` (`jecllmvbkiwhorczibxt`), region `ca-central-1`, $0/month (confirmed via `get_cost` before creation).
-- Both migrations applied and verified via `get_advisors` + `list_tables`: 20 tables, all RLS-enabled, seed counts correct (10 record types, 12 asset categories).
-- Security-advisor finding fixed same-session, before any real data existed: `is_org_member`/`is_org_admin`/`create_organization` were still callable by the unauthenticated `anon` role after the original migration's `revoke ... from public` — that revoke targeted the wrong grantee, since Supabase grants EXECUTE directly to `anon`/`authenticated`, not through `public`. Fixed in `supabase/migrations/20260908000100_security_hardening.sql` (revoke from `anon` explicitly) and re-verified clean. `create_organization`'s actual exploitability was already zero thanks to its own `auth.uid() is null` guard — a real example of why the defense-in-depth rule in CLAUDE.md/ADR 0002 (grant-level AND function-level checks) matters in practice, not just in theory.
-- One advisory finding left open, deliberately deferred rather than rushed: `pg_trgm` extension installed in the `public` schema (Supabase recommends a dedicated `extensions` schema). Low real risk (namespace hygiene, not a data-exposure issue); moving it now would mean dropping and recreating 8 trigram indexes. Tracked here for a deliberate follow-up rather than done under time pressure.
-
 ## Decisions log
 
-See [docs/decisions/](decisions/) for full ADRs. Summary: Next.js+Supabase+Vercel stack (0001); RLS-based multi-tenancy with a denormalized `organization_id` on every tenant table (0002); centralized branding so the working title can change without a refactor (0003); AI/OCR extraction behind a provider interface with a free/local default (0004); one flexible `records` table instead of one table per record type, `vendors`/`contractors` unified (0005).
+See [docs/decisions/](decisions/) for full ADRs (0001 stack, 0002 RLS multi-tenancy, 0003 branding abstraction, 0004 extraction-provider abstraction, 0005 flexible record modeling).
 
 ## Test status
 
-- Database RLS: manually verified, passing (see above). Not yet automated into CI.
-- Application: no application code beyond the scaffold's default page yet — nothing to test.
 - `pnpm build`: passing.
+- `pnpm test` (Vitest): 11/11 passing.
+- RLS cross-tenant isolation: passing (manual script, see `supabase/tests/`).
+- Full auth + onboarding + properties CRUD: live-verified in-browser, see above.
