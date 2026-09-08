@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-08 (smart capture / OCR added)
+Last updated: 2026-09-08 (PWA added — MVP feature set now complete)
 
 ## Completed
 
@@ -27,6 +27,8 @@ Last updated: 2026-09-08 (smart capture / OCR added)
 **Export** — `src/lib/csv.ts` (generic `toCsv`/`csvResponse` helpers), three CSV routes (`/properties/[id]/export/{records,assets,expenses}`) and one PDF route (`/properties/[id]/export/report`, `src/lib/pdf/property-report.tsx` via `@react-pdf/renderer`). The PDF covers Assets/History/Warranties/Expenses with a computed expense total, footed with the branding name. Linked from the property page's new Export section.
 
 **Smart capture (OCR)** — `src/lib/extraction/` implements ADR 0004's `ExtractionProvider` interface with a free/local baseline (`tesseract.js`, no API key, no paid provider required). `parse.ts` holds the pure regex extraction logic (vendor/date/total for receipts; manufacturer/model/serial for appliance labels), independently unit-tested. A "Scan the appliance label" button on the new-asset form and a "Scan a receipt" button on the expense form each run OCR through a server action and fill in the (still-editable) form fields for the user to review before saving -- nothing is auto-committed. See Issues below for two real bugs this surfaced.
+
+**PWA** — `src/app/manifest.ts` (installable, `display: "standalone"`, name/description pulled from `branding.ts`), code-generated icons via `next/og`'s `ImageResponse` (`scripts/generate-icons.mjs`, `pnpm generate-icons` -- a plain house glyph, no brand text, so it never goes stale on a rename per ADR 0003), `app/icon.png`/`app/apple-icon.png` (Next's native favicon/apple-touch-icon file convention) plus `public/icon-{192,512}.png` for the manifest. A hand-written `public/sw.js` (no third-party PWA library) does cache-first for hashed static assets and network-first-with-cache-fallback for page navigations, falling back further to `/offline` for a page never visited before; registered from a small client component in the root layout. Removed the stale default create-next-app `favicon.ico` and unused scaffold SVGs from `public/` while touching this area, since the old favicon would otherwise compete with the new one.
 
 **Testing** — Vitest + RTL configured (`pnpm test`), 15 passing unit tests (validation schemas + `advanceDueDate` date arithmetic). `pnpm build` clean throughout. Playwright not yet set up. `src/lib/supabase/database.types.ts` generated from the real schema (regenerate via the Supabase MCP connector after schema changes).
 
@@ -57,14 +59,19 @@ Note on how that was tested, not a product bug: pressing Enter to submit via the
 
 **Smart capture (OCR)** — a synthetic appliance-label photo (canvas-rendered in-browser, fed to the file input via `DataTransfer` so no real camera/file is needed) scanned on the new-asset form: manufacturer/model/serial all extracted correctly (`WHIRLPOOL` / `WRF555SDFZ` / `K12345678`), reviewed, saved, and confirmed byte-for-byte in the raw `assets` row. A synthetic receipt scanned on the expense form: vendor/date/total extracted correctly including correctly preferring the labeled "Total" line over "Subtotal" (`HOME DEPOT` / `2026-03-15` / `$12.96`), saved, and confirmed in the raw `expenses` row (vendor landed in the newly-added notes field). Confidence score and raw OCR text are threaded through but not yet surfaced in the UI beyond the "review before saving" prompt. The regex parsing layer (`src/lib/extraction/parse.ts`) has 8 unit tests independent of OCR accuracy. Not tested: real camera photos (angled, low-light, handwriting) -- only clean synthetic text, so real-world accuracy is unproven; the review-before-save step is the safety net for that per ADR 0004.
 
+**PWA** — `pnpm build` confirms `/manifest.webmanifest`, `/icon.png`, `/apple-icon.png`, and `/offline` all registered as static routes. Live-verified: the manifest fetches with the correct name/icons/`display: "standalone"`; Next auto-linked the `<link rel="icon">`/`<link rel="apple-touch-icon">`/`<link rel="manifest">` tags; the service worker registers and reaches `activated` state; the install-time precache holds `/offline`. Offline behavior specifically tested by killing the dev server outright (not just DevTools throttling) and confirming: (1) a previously-visited page (`/login`) still renders correctly from cache, (2) a never-visited page (`/forgot-password`) falls back to the friendly `/offline` page instead of a browser error, and (3) restarting the server and reloading immediately serves fresh content again -- the network-first strategy doesn't trap users on stale data. Not tested: an actual "Add to Home Screen" install flow on a real mobile device/OS (Lighthouse-style installability criteria beyond the manifest+service-worker basics aren't verifiable from this environment), and Web Push notifications were intentionally not built -- out of scope for what "PWA setup" required here (installable + offline-resilient), and a meaningfully separate feature (VAPID keys, subscription storage, a notification-sending trigger) if wanted later.
+
+With this, all items the roadmap flagged as MVP-gating are done: property/space/asset/record data model, attachments, warranties, expenses, reminders, search, QR labels, export, smart capture, and PWA.
+
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
-2. PWA setup — the last remaining MVP-gate item.
+2. Security testing / QA pass and performance optimization -- next up per the roadmap's execution order, now that the MVP feature set is complete.
 3. Extend attachments to records/warranties too (property and asset already covered; the action already supports any owner column).
 4. A dashboard widget surfacing expiring warranties / upcoming reminders across all of a user's properties (currently per-property view only).
 5. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
 6. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
+7. Marketing site polish, user-facing docs, and CI/CD -- later roadmap phases, not yet started.
 
 ## Blockers
 
