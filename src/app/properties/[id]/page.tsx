@@ -4,17 +4,25 @@ import { requireUser } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { PropertyEditForm } from "./property-edit-form";
 import { SpacesSection } from "./spaces-section";
+import { RecordsSection } from "./records-section";
 
 export default async function PropertyDetailPage(props: PageProps<"/properties/[id]">) {
   await requireUser();
   const { id } = await props.params;
 
   const supabase = await createClient();
-  const [{ data: property }, { data: spaces }, { data: assets }] = await Promise.all([
-    supabase.from("properties").select("*").eq("id", id).maybeSingle(),
-    supabase.from("spaces").select("*").eq("property_id", id).order("created_at"),
-    supabase.from("assets").select("*").eq("property_id", id).order("created_at"),
-  ]);
+  const [{ data: property }, { data: spaces }, { data: assets }, { data: recordTypes }, { data: records }] =
+    await Promise.all([
+      supabase.from("properties").select("*").eq("id", id).maybeSingle(),
+      supabase.from("spaces").select("*").eq("property_id", id).order("created_at"),
+      supabase.from("assets").select("*").eq("property_id", id).order("created_at"),
+      supabase.from("record_types").select("*").order("label"),
+      supabase
+        .from("records")
+        .select("*, record_types(label), spaces(name), assets(name)")
+        .eq("property_id", id)
+        .order("occurred_on", { ascending: false }),
+    ]);
 
   if (!property) {
     notFound();
@@ -60,6 +68,15 @@ export default async function PropertyDetailPage(props: PageProps<"/properties/[
           + Add an asset
         </Link>
       </section>
+
+      <RecordsSection
+        propertyId={property.id}
+        organizationId={property.organization_id}
+        recordTypes={recordTypes ?? []}
+        spaces={spaces ?? []}
+        assets={assets ?? []}
+        records={records ?? []}
+      />
     </div>
   );
 }

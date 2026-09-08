@@ -37,14 +37,17 @@ Full loop, no gaps: signup → onboarding (org + first property created) → das
 
 One more real issue found and fixed via live testing: a freshly-added nested dynamic route (`/properties/[id]/assets/new`) 404'd on the running dev server even though `pnpm build` had already validated it as a real route — a Turbopack dev-server file-watcher staleness quirk, resolved by restarting the dev server. Not a code defect; worth knowing if a brand-new route ever 404s despite a clean build.
 
+## Completed (continued)
+
+- **Records** (the flexible timeline entity, ADR 0005): `src/app/properties/[id]/records-section.tsx`, `src/lib/actions/records.ts`. A single "Attached to" selector (not two dropdowns) maps to `space_id` XOR `asset_id` server-side (`parseScope` in `src/lib/validations/record.ts`), matching the DB's `records_single_scope` check constraint by construction rather than by hoping the client behaves. Live-verified: added a space, added a record scoped to it with a cost, confirmed the raw row (`space_id` set, `asset_id` null) and the joined display (type/space/cost labels all correct via one embedded Supabase query), then deleted it.
+
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match what's in `supabase/config.toml`/`supabase/templates/` — there's no MCP tool for this, and it can't be verified until there's a real domain. Do this deliberately, don't assume the hosted defaults already match.
-2. Records (the flexible timeline entity — maintenance/repair/inspection/etc., per ADR 0005) attached to property/space/asset.
-3. Attachments (Supabase Storage upload flow — the bucket + policy already exist).
-4. Warranties, expenses, reminders, global search, QR, export, smart capture — per the roadmap, in that rough order of MVP dependency.
-5. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
-6. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
+2. Attachments (Supabase Storage upload flow — the bucket + policy already exist) — the natural next step, since records/assets/warranties all want to hang a photo or receipt off of them.
+3. Warranties, expenses, reminders, global search, QR, export, smart capture — per the roadmap, in that rough order of MVP dependency.
+4. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
+5. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
 
 ## Blockers
 
