@@ -41,10 +41,14 @@ Everything above was exercised **live in-browser** against the local Supabase st
 7. **`advanceDueDate`'s month arithmetic overflowed on month-end dates** — a monthly reminder due Jan 31 would silently jump to Mar 3 instead of Feb 28, skipping February. Caught by a unit test written *before* trusting the function (`src/lib/validations/reminder.test.ts`, includes a leap-year case), then fixed by clamping to the target month's actual last day.
 8. Two Supabase local-stack Docker networking flakes (stale DNS after restarting one container out of sync with the rest of the stack) — resolved with a full `supabase stop && supabase start`. Not a code issue.
 
+**Global search** — `src/app/search/page.tsx`. A plain `<form method="get">` (no server action needed for a read) running structured `ilike` queries across properties/assets/records/vendors in parallel, RLS-scoped automatically like every other query in the app. One query layer so a later semantic-search addition is an internal swap (ARCHITECTURE.md). Live-verified: exact and case-insensitive substring matches against a property address and an asset manufacturer, and a genuine no-results case, all against real data.
+
+Note on how that was tested, not a product bug: pressing Enter to submit via the browser-automation tool's synthetic keyboard events didn't trigger the native single-input-form-submits-on-Enter behavior, which real browsers gate to trusted user-generated keystrokes. Diagnosed with direct JS inspection (`input.value`, `window.location.href`) rather than assumed, confirmed not a bug, then added a visible Search submit button anyway since that's better UX/accessibility regardless of the testing wrinkle -- verified the real functionality through that button instead.
+
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
-2. Global search, QR asset identifiers, PDF/CSV export, smart capture, PWA — the remaining MVP-gate items.
+2. QR asset identifiers, PDF/CSV export, smart capture, PWA — the remaining MVP-gate items.
 3. Extend attachments to records/warranties too (property and asset already covered; the action already supports any owner column).
 4. A dashboard widget surfacing expiring warranties / upcoming reminders across all of a user's properties (currently per-property view only).
 5. Units UI, if/when a landlord-focused push warrants it (schema already supports it).

@@ -23,11 +23,16 @@ export default async function DashboardPage() {
           <p className="text-sm text-zinc-500">{membership.organizations.name}</p>
           <h1 className="text-2xl font-semibold tracking-tight">Your properties</h1>
         </div>
-        <form action={logOut}>
-          <button type="submit" className="text-sm underline text-zinc-600 dark:text-zinc-400">
-            Log out
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/search" className="text-sm underline text-zinc-600 dark:text-zinc-400">
+            Search
+          </Link>
+          <form action={logOut}>
+            <button type="submit" className="text-sm underline text-zinc-600 dark:text-zinc-400">
+              Log out
+            </button>
+          </form>
+        </div>
       </div>
 
       <ul className="mt-8 divide-y divide-zinc-200 dark:divide-zinc-800">
