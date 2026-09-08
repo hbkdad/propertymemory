@@ -22,6 +22,7 @@ test-results/
 .DS_Store
 *.pem
 .vercel
+*.traineddata
 
 # supabase local dev artifacts (config.toml and migrations ARE tracked)
 supabase/.branches

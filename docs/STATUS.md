@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-08 (export feature added)
+Last updated: 2026-09-08 (smart capture / OCR added)
 
 ## Completed
 
@@ -26,6 +26,8 @@ Last updated: 2026-09-08 (export feature added)
 
 **Export** — `src/lib/csv.ts` (generic `toCsv`/`csvResponse` helpers), three CSV routes (`/properties/[id]/export/{records,assets,expenses}`) and one PDF route (`/properties/[id]/export/report`, `src/lib/pdf/property-report.tsx` via `@react-pdf/renderer`). The PDF covers Assets/History/Warranties/Expenses with a computed expense total, footed with the branding name. Linked from the property page's new Export section.
 
+**Smart capture (OCR)** — `src/lib/extraction/` implements ADR 0004's `ExtractionProvider` interface with a free/local baseline (`tesseract.js`, no API key, no paid provider required). `parse.ts` holds the pure regex extraction logic (vendor/date/total for receipts; manufacturer/model/serial for appliance labels), independently unit-tested. A "Scan the appliance label" button on the new-asset form and a "Scan a receipt" button on the expense form each run OCR through a server action and fill in the (still-editable) form fields for the user to review before saving -- nothing is auto-committed. See Issues below for two real bugs this surfaced.
+
 **Testing** — Vitest + RTL configured (`pnpm test`), 15 passing unit tests (validation schemas + `advanceDueDate` date arithmetic). `pnpm build` clean throughout. Playwright not yet set up. `src/lib/supabase/database.types.ts` generated from the real schema (regenerate via the Supabase MCP connector after schema changes).
 
 ## Verified
@@ -42,6 +44,8 @@ Everything above was exercised **live in-browser** against the local Supabase st
 6. **A freshly-added nested route 404'd on the dev server** despite a clean `pnpm build` — Turbopack file-watcher staleness, resolved by restarting the dev server. Not a code defect.
 7. **`advanceDueDate`'s month arithmetic overflowed on month-end dates** — a monthly reminder due Jan 31 would silently jump to Mar 3 instead of Feb 28, skipping February. Caught by a unit test written *before* trusting the function (`src/lib/validations/reminder.test.ts`, includes a leap-year case), then fixed by clamping to the target month's actual last day.
 8. Two Supabase local-stack Docker networking flakes (stale DNS after restarting one container out of sync with the rest of the stack) — resolved with a full `supabase stop && supabase start`. Not a code issue.
+9. **`tesseract.js` broke with `MODULE_NOT_FOUND` when bundled** — it spawns a worker thread by resolving a real filesystem path to its own worker script at runtime, and Turbopack/webpack rewrite that path when the package is bundled into the server graph, pointing it at a path that doesn't exist. Fixed with `serverExternalPackages: ["tesseract.js", "tesseract.js-core"]` in `next.config.ts`, which tells Next to `require()` it directly from `node_modules` instead of bundling it. Confirmed fixed under **both** `next dev` (Turbopack) and a real `next build` + `next start` (webpack) — the two bundlers are different enough that fixing one without checking the other would have been a real gap.
+10. **Duplicate `id="notes"`** after adding a notes field to the expense form — `PropertyEditForm` already used that id on the same page, so `<label htmlFor="notes">` in the new expense form would have focused the wrong field. Caught by inspecting the actual DOM during live verification (a `getElementById` check silently returned the wrong element), fixed by renaming the new field's id to `expenseNotes`.
 
 **Global search** — `src/app/search/page.tsx`. A plain `<form method="get">` (no server action needed for a read) running structured `ilike` queries across properties/assets/records/vendors in parallel, RLS-scoped automatically like every other query in the app. One query layer so a later semantic-search addition is an internal swap (ARCHITECTURE.md). Live-verified: exact and case-insensitive substring matches against a property address and an asset manufacturer, and a genuine no-results case, all against real data.
 
@@ -51,10 +55,12 @@ Note on how that was tested, not a product bug: pressing Enter to submit via the
 
 **PDF/CSV export** — one property ("12 Main Street") seeded with a real asset, record, warranty, and expense, then all four export routes hit live. CSV bodies checked byte-for-byte: Records (`Date,Type,Title,Description,Location,Cost` with the joined record-type label), Assets (`Name,Category,Space,Manufacturer,...`), and Expenses (`Date,Amount,Tax,Total,...` with the total column computed server-side, e.g. `89.99` + `11.7` tax → `101.69`). PDF checked two ways: byte-signature (`%PDF-1.3` magic bytes, correct `Content-Type`/`Content-Disposition`, non-trivial size) and a full visual render (decoded to a local file and read as an image) confirming all four sections plus the computed expense total actually lay out correctly, not just that the bytes were valid. Browser console clean throughout. One testing-only wrinkle, not a bug: `Content-Disposition: attachment` makes these URLs undownloadable via `navigate()` in the browser-automation tool (it blocks the download), so verification used same-origin `fetch()` inside the page instead.
 
+**Smart capture (OCR)** — a synthetic appliance-label photo (canvas-rendered in-browser, fed to the file input via `DataTransfer` so no real camera/file is needed) scanned on the new-asset form: manufacturer/model/serial all extracted correctly (`WHIRLPOOL` / `WRF555SDFZ` / `K12345678`), reviewed, saved, and confirmed byte-for-byte in the raw `assets` row. A synthetic receipt scanned on the expense form: vendor/date/total extracted correctly including correctly preferring the labeled "Total" line over "Subtotal" (`HOME DEPOT` / `2026-03-15` / `$12.96`), saved, and confirmed in the raw `expenses` row (vendor landed in the newly-added notes field). Confidence score and raw OCR text are threaded through but not yet surfaced in the UI beyond the "review before saving" prompt. The regex parsing layer (`src/lib/extraction/parse.ts`) has 8 unit tests independent of OCR accuracy. Not tested: real camera photos (angled, low-light, handwriting) -- only clean synthetic text, so real-world accuracy is unproven; the review-before-save step is the safety net for that per ADR 0004.
+
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
-2. Smart capture (OCR extraction) and PWA setup — the remaining MVP-gate items.
+2. PWA setup — the last remaining MVP-gate item.
 3. Extend attachments to records/warranties too (property and asset already covered; the action already supports any owner column).
 4. A dashboard widget surfacing expiring warranties / upcoming reminders across all of a user's properties (currently per-property view only).
 5. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
@@ -70,7 +76,7 @@ See [docs/decisions/](decisions/) for full ADRs (0001 stack, 0002 RLS multi-tena
 
 ## Test status
 
-- `pnpm build`: passing.
-- `pnpm test` (Vitest): 15/15 passing.
+- `pnpm build`: passing (both Turbopack `next dev` and a real `next build` + `next start` checked for the OCR feature specifically, see Issues #9).
+- `pnpm test` (Vitest): 23/23 passing.
 - RLS cross-tenant isolation: passing (manual script, see `supabase/tests/`).
 - Full auth + onboarding + property data model (spaces/assets/records/attachments/warranties/expenses/reminders): live-verified in-browser, see above.

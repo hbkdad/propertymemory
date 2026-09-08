@@ -1,8 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { AssetFormState } from "@/lib/actions/assets";
+import { extractApplianceLabelAction } from "@/lib/actions/extraction";
+import type { ApplianceLabelExtraction } from "@/lib/extraction";
 import type { Tables } from "@/lib/supabase/database.types";
+import { ScanButton } from "./scan-button";
 
 type BoundAction = (state: AssetFormState, formData: FormData) => Promise<AssetFormState>;
 
@@ -20,6 +23,15 @@ export function AssetForm({
   submitLabel: string;
 }) {
   const [state, action, pending] = useActionState(boundAction, undefined);
+  const [manufacturer, setManufacturer] = useState(initial?.manufacturer ?? "");
+  const [modelNumber, setModelNumber] = useState(initial?.model_number ?? "");
+  const [serialNumber, setSerialNumber] = useState(initial?.serial_number ?? "");
+
+  function handleScanned(data: ApplianceLabelExtraction) {
+    if (data.manufacturer) setManufacturer(data.manufacturer);
+    if (data.modelNumber) setModelNumber(data.modelNumber);
+    if (data.serialNumber) setSerialNumber(data.serialNumber);
+  }
 
   return (
     <form action={action} className="mt-6 space-y-4">
@@ -77,6 +89,8 @@ export function AssetForm({
         </div>
       </div>
 
+      <ScanButton label="Scan the appliance label" action={extractApplianceLabelAction} onResult={handleScanned} />
+
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label htmlFor="manufacturer" className="text-sm font-medium">
@@ -85,7 +99,8 @@ export function AssetForm({
           <input
             id="manufacturer"
             name="manufacturer"
-            defaultValue={initial?.manufacturer ?? ""}
+            value={manufacturer}
+            onChange={(event) => setManufacturer(event.target.value)}
             className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
@@ -96,7 +111,8 @@ export function AssetForm({
           <input
             id="modelNumber"
             name="modelNumber"
-            defaultValue={initial?.model_number ?? ""}
+            value={modelNumber}
+            onChange={(event) => setModelNumber(event.target.value)}
             className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
@@ -109,7 +125,8 @@ export function AssetForm({
         <input
           id="serialNumber"
           name="serialNumber"
-          defaultValue={initial?.serial_number ?? ""}
+          value={serialNumber}
+          onChange={(event) => setSerialNumber(event.target.value)}
           className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         />
       </div>

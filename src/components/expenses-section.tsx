@@ -1,9 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createExpense, deleteExpense } from "@/lib/actions/expenses";
+import { extractReceiptAction } from "@/lib/actions/extraction";
+import type { ReceiptExtraction } from "@/lib/extraction";
 import { expenseCategories, expenseCategoryLabels } from "@/lib/validations/expense";
 import type { Tables } from "@/lib/supabase/database.types";
+import { ScanButton } from "./scan-button";
 
 export function ExpensesSection({
   propertyId,
@@ -17,6 +20,17 @@ export function ExpensesSection({
   const redirectPath = `/properties/${propertyId}`;
   const createWithIds = createExpense.bind(null, propertyId, organizationId, redirectPath);
   const [state, action, pending] = useActionState(createWithIds, undefined);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [amount, setAmount] = useState("");
+  const [expenseDate, setExpenseDate] = useState(today);
+  const [notes, setNotes] = useState("");
+
+  function handleScanned(data: ReceiptExtraction) {
+    if (data.total !== null) setAmount(data.total.toFixed(2));
+    if (data.date) setExpenseDate(data.date);
+    if (data.vendor) setNotes((current) => current || `Vendor: ${data.vendor}`);
+  }
 
   const total = expenses.reduce((sum, expense) => sum + expense.amount + expense.tax_amount, 0);
 
@@ -57,6 +71,8 @@ export function ExpensesSection({
         action={action}
         className="mt-4 space-y-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-800"
       >
+        <ScanButton label="Scan a receipt" action={extractReceiptAction} onResult={handleScanned} />
+
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">
             <label htmlFor="amount" className="text-xs font-medium">
@@ -68,6 +84,8 @@ export function ExpensesSection({
               inputMode="decimal"
               required
               placeholder="0.00"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
               className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
             {state?.errors?.amount && (
@@ -95,7 +113,8 @@ export function ExpensesSection({
               name="expenseDate"
               type="date"
               required
-              defaultValue={new Date().toISOString().slice(0, 10)}
+              value={expenseDate}
+              onChange={(event) => setExpenseDate(event.target.value)}
               className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
           </div>
@@ -117,6 +136,20 @@ export function ExpensesSection({
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="expenseNotes" className="text-xs font-medium">
+            Notes <span className="text-zinc-400">(optional)</span>
+          </label>
+          <input
+            id="expenseNotes"
+            name="notes"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="e.g. Vendor name"
+            className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
         </div>
 
         {state?.message && <p className="text-sm text-red-600">{state.message}</p>}
