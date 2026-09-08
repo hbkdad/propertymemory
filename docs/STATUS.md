@@ -30,13 +30,21 @@ Full loop, no gaps: signup → onboarding (org + first property created) → das
 5. **A native `window.confirm()` for delete silently no-op'd** in the automated browser testing context — replaced with a proper in-page two-step confirmation, which is also better UX/accessibility and doesn't depend on browser-specific dialog behavior.
 6. Two Supabase local-stack Docker networking flakes (a stale DNS resolution after restarting a single container out of sync with the rest of the stack) — resolved both times with a full `supabase stop && supabase start`, not by working around them. Not a code issue.
 
+## Completed (continued)
+
+- **Spaces and Assets CRUD**, nested under the property detail page (`src/app/properties/[id]/spaces-section.tsx`, `src/lib/actions/spaces.ts`; `src/app/properties/[id]/assets/new/`, `src/app/assets/[id]/`, `src/lib/actions/assets.ts`, shared `src/components/asset-form.tsx`). Units are intentionally not built yet — spaces attach directly to the property for now (`unit_id` left null), which covers the primary homeowner persona; landlord-specific units UI is deferred, not designed away (the schema already supports it).
+- Live-verified end to end: add space → add asset (category + space dropdowns populated correctly from real data) → edit asset → delete asset → remove space.
+
+One more real issue found and fixed via live testing: a freshly-added nested dynamic route (`/properties/[id]/assets/new`) 404'd on the running dev server even though `pnpm build` had already validated it as a real route — a Turbopack dev-server file-watcher staleness quirk, resolved by restarting the dev server. Not a code defect; worth knowing if a brand-new route ever 404s despite a clean build.
+
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match what's in `supabase/config.toml`/`supabase/templates/` — there's no MCP tool for this, and it can't be verified until there's a real domain. Do this deliberately, don't assume the hosted defaults already match.
-2. Units/spaces/assets/records — the rest of the entity hierarchy per the PRD, following the same pattern as properties (Zod schema → server actions → pages, RLS already in place from the initial migration).
+2. Records (the flexible timeline entity — maintenance/repair/inspection/etc., per ADR 0005) attached to property/space/asset.
 3. Attachments (Supabase Storage upload flow — the bucket + policy already exist).
-4. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
-5. Warranties, expenses, reminders, global search, QR, export, smart capture — per the roadmap, in that rough order of MVP dependency.
+4. Warranties, expenses, reminders, global search, QR, export, smart capture — per the roadmap, in that rough order of MVP dependency.
+5. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
+6. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
 
 ## Blockers
 
