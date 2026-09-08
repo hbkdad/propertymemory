@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-08 (docs added — marketing site, CI, and docs phase all complete)
+Last updated: 2026-09-08 (release assessment — see bottom of this file)
 
 ## Completed
 
@@ -126,3 +126,20 @@ See [docs/decisions/](decisions/) for full ADRs (0001 stack, 0002 RLS multi-tena
 - Supabase security advisors: one real finding closed (`pg_trgm` schema placement); the remaining WARN confirmed intentional by reading the function bodies, not just re-running the tool.
 - Security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors`): present on live responses, confirmed via `fetch()`.
 - Full auth + onboarding + property data model (spaces/assets/records/attachments/warranties/expenses/reminders): live-verified in-browser, see above.
+
+## Release assessment
+
+The roadmap's execution order is now complete end to end: environment → governance → schema → auth → the full property data model → export → smart capture → PWA → security testing → QA → optimize → marketing site → docs → CI/CD → this assessment. Every phase was live-verified against a real local Supabase stack (and the security/index work against the real hosted project too), not just built and assumed working -- see the Verified and Test status sections above for specifics, and Issues #1-15 for what was actually found and fixed along the way rather than swept under the rug.
+
+**Zero-capital constraint: independently reconfirmed, not just assumed.** The real Supabase organization is on the `free` plan (checked via `get_organization`, not inferred). The entire app depends on exactly two environment variables anywhere in `src/` -- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` -- both free-tier values (grepped the whole tree to confirm, not eyeballed). Smart capture's OCR is `tesseract.js`, free and local, with no paid provider wired in or required. Nothing in the stack requires a credit card to keep running.
+
+**Ready for a soft/personal launch today** (the user using it for their own property, or handing it to a few trusted people): yes. The core loop -- capture, organize, remember, find -- works, is tested, and holds up under multi-tenant isolation testing (including live IDOR attempts, not just RLS policy review).
+
+**Not yet ready for a public multi-user launch**, specifically because of:
+1. The real Supabase project's Auth email templates and redirect URLs are still pointed at local dev config -- this is a mechanical config task blocked on having a real domain, not unfinished code (see Next, item 2).
+2. No rate limiting on the OCR endpoint -- an authenticated user could run up server compute by scanning repeatedly. Accepted and documented, not silently ignored, because a real fix costs money this project isn't spending yet.
+3. RLS isolation is proven by a thorough manual script and live testing, not yet by an automated check that runs on every future change -- a regression could theoretically slip in before someone thinks to re-run `rls_smoke_test.sql` by hand.
+
+**Deliberately out of scope, not gaps**: rent collection, tenant screening, accounting, payroll, listing syndication, banking -- per the PRD's own non-goals. This is not, and was never meant to be, a Buildium/AppFolio/QuickBooks competitor.
+
+**Recommendation**: safe to start using for real, personal use right now. Treat items 1-3 above as the actual launch checklist before inviting the public, not "someday" items -- particularly item 1, since email confirmation and password reset genuinely will not work correctly for real users on a real domain until it's done.
