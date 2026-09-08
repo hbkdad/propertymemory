@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-08 (mobile QA pass complete)
+Last updated: 2026-09-08 (performance optimization pass complete)
 
 ## Completed
 
@@ -79,18 +79,24 @@ With this, all items the roadmap flagged as MVP-gating are done: property/space/
 
 **Mobile QA** — the app's first dedicated pass at an actual mobile viewport (375×812) rather than desktop width; the PWA is squarely meant for phone use, so this was overdue. Full flow re-run at mobile width: signup → onboarding → property page (every section: spaces, assets, records, warranties, attachments, expenses, reminders, export) → new-asset form (including the appliance-label scan) → asset detail page (QR label) → search → a real result. Found and fixed one real layout bug (Issue #13) and ran down one very convincing false alarm (Issue #14) rather than either dismissing it or blindly "fixing" already-correct code. Not covered: real touch-gesture testing (swipe, pinch-zoom) or an actual physical device -- this was viewport-size emulation only.
 
+**Performance optimization** — checked the areas that actually matter for a Next.js + Supabase app before touching anything:
+1. Client bundle size: inspected `.next/static/chunks/*.js` after a production build directly (Turbopack's production output doesn't print Next's classic per-route First-Load-JS table) -- largest chunk is 368K (framework runtime), nothing outsized. Explicitly grepped every chunk for `tesseract`/`react-pdf`/`createWorker` and found zero matches, confirming those two heavy server-only packages never leak into what ships to the browser.
+2. No `next/image` opportunity was missed -- attachments are deliberately shown as plain download links (filename + "open in new tab"), never as inline `<img>` previews, so there's no unoptimized-image problem to begin with.
+3. No N+1 query patterns: grepped every client component for direct Supabase calls and found none -- all data fetching happens in Server Components via one parallel `Promise.all()` per page, passed down as props, exactly as it should be.
+4. **26 unindexed foreign keys** (flagged by the security-advisor sweep earlier and deliberately deferred to this phase) -- added covering indexes for all of them (`supabase/migrations/20260908000300_foreign_key_indexes.sql`), applied to both local and the real project, re-verified via `get_advisors` that the finding is now gone entirely. These matter most for how fast a CASCADE delete (deleting a property or asset, a real feature here) can check for referencing rows, not just for JOINs. The advisor's separate "unused index" INFO-level finding (now 71, up by exactly the 26 added) is expected noise for a pre-launch project with near-zero real query traffic and wasn't acted on -- `pg_stat_user_indexes` only reflects actual traffic, and there isn't any yet.
+5. **Smart-capture photos were uploaded at full camera resolution** before OCR, which only needs legible text, not a 12-megapixel image -- a real, avoidable cost in upload time, OCR processing time, and how often a legitimate phone photo would trip the 10MB server-side cap. Added client-side downscaling in `scan-button.tsx` (`createImageBitmap` + canvas, capped at 1600px on the longest side, re-encoded as JPEG at 0.85 quality, original file used as a safe fallback on any failure since this is a pure optimization that must never block a real scan). Verified live with a synthetic 4000×2000 image: correctly downscaled to exactly 1600×800 before upload, OCR still read all three fields correctly off the smaller version, and the actual stored file (fetched back and measured, not assumed) matched.
+
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
-2. Performance optimization -- next up per the roadmap's execution order, now that the MVP feature set, a dedicated security-testing pass, and a mobile QA pass are all complete.
-3. A full script/style-restricting CSP (nonce-based, via `proxy.ts`), if/when there's a stronger reason to invest in it -- deliberately deferred this round, see Security testing above.
+2. **Next up per the roadmap's execution order**: marketing site polish, user-facing docs, and CI/CD -- the MVP feature set, security testing, mobile QA, and performance optimization are all now complete.
+3. A full script/style-restricting CSP (nonce-based, via `proxy.ts`), if/when there's a stronger reason to invest in it -- deliberately deferred, see Security testing above.
 4. Real rate limiting on the OCR endpoint if usage ever justifies the cost of a shared store (Redis/Upstash) -- not solvable for $0 today, see Security testing above.
 5. Extend attachments to records/warranties too (property and asset already covered; the action already supports any owner column).
 6. A dashboard widget surfacing expiring warranties / upcoming reminders across all of a user's properties (currently per-property view only).
 7. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
 8. Playwright E2E setup, and promoting `rls_smoke_test.sql` from a manual script to an automated check.
-9. Marketing site polish, user-facing docs, and CI/CD -- later roadmap phases, not yet started.
-10. Real device/touch testing for the PWA -- this round's mobile QA was viewport-emulation only.
+9. Real device/touch testing for the PWA -- this round's mobile QA was viewport-emulation only.
 
 ## Blockers
 
