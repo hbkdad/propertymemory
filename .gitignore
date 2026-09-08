@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# testing
+coverage/
+playwright-report/
+test-results/
+
+# env
+.env
+.env*.local
+!.env.example
+
+# misc
+.DS_Store
+*.pem
+.vercel
+
+# supabase local dev artifacts (config.toml and migrations ARE tracked)
+supabase/.branches
+supabase/.temp
+
+# logs
+npm-debug.log*
+pnpm-debug.log*
