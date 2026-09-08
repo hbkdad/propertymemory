@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-08
+Last updated: 2026-09-08 (export feature added)
 
 ## Completed
 
@@ -23,6 +23,8 @@ Last updated: 2026-09-08
 - Warranties — `src/components/warranties-section.tsx`, `src/lib/actions/warranties.ts`, shown on both property (whole-property, `asset_id is null`) and asset pages (one component, `assetId` prop picks the mode). Flags anything expiring within 60 days
 - Expenses — `src/components/expenses-section.tsx`, `src/lib/actions/expenses.ts`, with a running total per property
 - Reminders — `src/components/reminders-section.tsx`, `src/lib/actions/reminders.ts`, `src/lib/validations/reminder.ts`. One-time reminders go inactive on completion; recurring ones roll `due_on` forward and stay active. Overdue ones are flagged
+
+**Export** — `src/lib/csv.ts` (generic `toCsv`/`csvResponse` helpers), three CSV routes (`/properties/[id]/export/{records,assets,expenses}`) and one PDF route (`/properties/[id]/export/report`, `src/lib/pdf/property-report.tsx` via `@react-pdf/renderer`). The PDF covers Assets/History/Warranties/Expenses with a computed expense total, footed with the branding name. Linked from the property page's new Export section.
 
 **Testing** — Vitest + RTL configured (`pnpm test`), 15 passing unit tests (validation schemas + `advanceDueDate` date arithmetic). `pnpm build` clean throughout. Playwright not yet set up. `src/lib/supabase/database.types.ts` generated from the real schema (regenerate via the Supabase MCP connector after schema changes).
 
@@ -47,10 +49,12 @@ Note on how that was tested, not a product bug: pressing Enter to submit via the
 
 **QR asset identifiers** — `src/lib/qr.ts` (the `qrcode` package), a QR + plain-text URL on the asset page, and a dedicated printable label at `/assets/[id]/label` (`print-button.tsx` client island calling `window.print()`, `print:hidden` on the button so it doesn't appear in the printed output). No separate opaque public ID was needed -- asset primary keys are already random UUIDs (ADR/architecture decision), so the QR just encodes the normal authenticated asset URL. The origin is reconstructed from the `Host` header + `x-forwarded-proto` (a plain page GET carries no `Origin` header, unlike a Server Action POST -- verified this distinction rather than assuming the same helper would work in both places). Live-verified: the visible plain-text URL next to the QR matched the actual current asset's URL exactly; the QR itself renders with correct finder-pattern structure (not corrupt output); the Print button was confirmed to genuinely invoke the browser's native print dialog.
 
+**PDF/CSV export** — one property ("12 Main Street") seeded with a real asset, record, warranty, and expense, then all four export routes hit live. CSV bodies checked byte-for-byte: Records (`Date,Type,Title,Description,Location,Cost` with the joined record-type label), Assets (`Name,Category,Space,Manufacturer,...`), and Expenses (`Date,Amount,Tax,Total,...` with the total column computed server-side, e.g. `89.99` + `11.7` tax → `101.69`). PDF checked two ways: byte-signature (`%PDF-1.3` magic bytes, correct `Content-Type`/`Content-Disposition`, non-trivial size) and a full visual render (decoded to a local file and read as an image) confirming all four sections plus the computed expense total actually lay out correctly, not just that the bytes were valid. Browser console clean throughout. One testing-only wrinkle, not a bug: `Content-Disposition: attachment` makes these URLs undownloadable via `navigate()` in the browser-automation tool (it blocks the download), so verification used same-origin `fetch()` inside the page instead.
+
 ## Next
 
 1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
-2. PDF/CSV export, smart capture, PWA — the remaining MVP-gate items.
+2. Smart capture (OCR extraction) and PWA setup — the remaining MVP-gate items.
 3. Extend attachments to records/warranties too (property and asset already covered; the action already supports any owner column).
 4. A dashboard widget surfacing expiring warranties / upcoming reminders across all of a user's properties (currently per-property view only).
 5. Units UI, if/when a landlord-focused push warrants it (schema already supports it).

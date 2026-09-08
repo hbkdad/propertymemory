@@ -133,6 +133,35 @@ export default async function PropertyDetailPage(props: PageProps<"/properties/[
         organizationId={property.organization_id}
         reminders={reminders ?? []}
       />
+
+      <section className="mt-10">
+        <h2 className="text-lg font-semibold">Export</h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          Download your data -- for an insurer, a buyer, or just a backup.
+        </p>
+        <ul className="mt-3 space-y-1 text-sm">
+          <li>
+            <a href={`/properties/${property.id}/export/report`} className="underline">
+              Full property report (PDF)
+            </a>
+          </li>
+          <li>
+            <a href={`/properties/${property.id}/export/records`} className="underline">
+              History (CSV)
+            </a>
+          </li>
+          <li>
+            <a href={`/properties/${property.id}/export/assets`} className="underline">
+              Assets (CSV)
+            </a>
+          </li>
+          <li>
+            <a href={`/properties/${property.id}/export/expenses`} className="underline">
+              Expenses (CSV)
+            </a>
+          </li>
+        </ul>
+      </section>
     </div>
   );
 }
