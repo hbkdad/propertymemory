@@ -11,12 +11,16 @@ type BoundAction = (state: AssetFormState, formData: FormData) => Promise<AssetF
 
 export function AssetForm({
   action: boundAction,
+  organizationId,
+  propertyId,
   categories,
   spaces,
   initial,
   submitLabel,
 }: {
   action: BoundAction;
+  organizationId: string;
+  propertyId: string;
   categories: Tables<"asset_categories">[];
   spaces: Tables<"spaces">[];
   initial?: Tables<"assets">;
@@ -89,7 +93,11 @@ export function AssetForm({
         </div>
       </div>
 
-      <ScanButton label="Scan the appliance label" action={extractApplianceLabelAction} onResult={handleScanned} />
+      <ScanButton
+        label="Scan the appliance label"
+        action={extractApplianceLabelAction.bind(null, organizationId, propertyId)}
+        onResult={handleScanned}
+      />
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">

@@ -71,7 +71,11 @@ export function ExpensesSection({
         action={action}
         className="mt-4 space-y-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-800"
       >
-        <ScanButton label="Scan a receipt" action={extractReceiptAction} onResult={handleScanned} />
+        <ScanButton
+          label="Scan a receipt"
+          action={extractReceiptAction.bind(null, organizationId, propertyId)}
+          onResult={handleScanned}
+        />
 
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">

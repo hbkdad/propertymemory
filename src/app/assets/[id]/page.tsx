@@ -52,6 +52,8 @@ export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) 
       <h1 className="mt-2 text-2xl font-semibold tracking-tight">{asset.name}</h1>
       <AssetForm
         action={updateWithIds}
+        organizationId={asset.organization_id}
+        propertyId={asset.property_id}
         categories={categories ?? []}
         spaces={spaces ?? []}
         initial={asset}

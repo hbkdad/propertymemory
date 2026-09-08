@@ -30,6 +30,8 @@ export default async function NewAssetPage(props: PageProps<"/properties/[id]/as
       <h1 className="mt-2 text-2xl font-semibold tracking-tight">Add an asset</h1>
       <AssetForm
         action={createWithIds}
+        organizationId={property.organization_id}
+        propertyId={property.id}
         categories={categories ?? []}
         spaces={spaces ?? []}
         submitLabel="Add asset"
