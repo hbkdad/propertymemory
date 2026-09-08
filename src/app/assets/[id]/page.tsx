@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { updateAsset } from "@/lib/actions/assets";
 import { AssetForm } from "@/components/asset-form";
 import { AttachmentsSection } from "@/components/attachments-section";
+import { WarrantiesSection } from "@/components/warranties-section";
 import { AssetDeleteButton } from "./asset-delete-button";
 
 export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) {
@@ -18,11 +19,13 @@ export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) 
     notFound();
   }
 
-  const [{ data: categories }, { data: spaces }, { data: attachments }] = await Promise.all([
-    supabase.from("asset_categories").select("*").order("label"),
-    supabase.from("spaces").select("*").eq("property_id", asset.property_id).order("name"),
-    supabase.from("attachments").select("*").eq("asset_id", asset.id).order("created_at"),
-  ]);
+  const [{ data: categories }, { data: spaces }, { data: attachments }, { data: warranties }] =
+    await Promise.all([
+      supabase.from("asset_categories").select("*").order("label"),
+      supabase.from("spaces").select("*").eq("property_id", asset.property_id).order("name"),
+      supabase.from("attachments").select("*").eq("asset_id", asset.id).order("created_at"),
+      supabase.from("warranties").select("*").eq("asset_id", asset.id).order("expires_on"),
+    ]);
 
   const paths = (attachments ?? []).map((attachment) => attachment.storage_path);
   const { data: signedUrls } =
@@ -59,6 +62,13 @@ export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) 
         ownerId={asset.id}
         redirectPath={redirectPath}
         attachments={attachmentsWithUrls}
+      />
+
+      <WarrantiesSection
+        propertyId={asset.property_id}
+        organizationId={asset.organization_id}
+        assetId={asset.id}
+        warranties={warranties ?? []}
       />
     </div>
   );
