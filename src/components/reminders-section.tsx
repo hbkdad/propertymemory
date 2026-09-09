@@ -77,11 +77,11 @@ export function RemindersSection({
         className="mt-4 space-y-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-800"
       >
         <div className="space-y-1">
-          <label htmlFor="title" className="text-xs font-medium">
+          <label htmlFor="reminderTitle" className="text-xs font-medium">
             Reminder
           </label>
           <input
-            id="title"
+            id="reminderTitle"
             name="title"
             required
             placeholder="e.g. Replace furnace filter"
