@@ -57,3 +57,40 @@ jobs:
       # cross-tenant regression, see supabase/tests/rls_smoke_test.sql) fail
       # this step with a non-zero exit code.
       - run: docker exec -i supabase_db_property psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/rls_smoke_test.sql
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # Same local-only stack as rls-smoke-test, but here the app itself
+      # needs to talk to it (Auth confirmation emails land in its Mailpit,
+      # see e2e/helpers.ts) -- not just psql.
+      - run: pnpm dlx supabase start
+
+      # The top-level env: block above sets placeholder Supabase values for
+      # build-and-test's benefit; this job actually exercises Auth/DB, so it
+      # needs the local stack's real (dynamically-assigned) URL/key instead.
+      # Writing to $GITHUB_ENV (not .env.local) is what makes these win --
+      # Next's dotenv loader never overrides a variable already present in
+      # process.env, and the workflow-level env: block put one there first.
+      - name: Point the app at the local Supabase stack
+        run: |
+          eval "$(pnpm dlx supabase status -o env)"
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> "$GITHUB_ENV"
+
+      # Builds and boots the app itself (see playwright.config.ts's
+      # webServer) before running the suite against it.
+      - run: pnpm test:e2e

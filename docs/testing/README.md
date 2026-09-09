@@ -18,4 +18,29 @@ Also found while automating this: psql's `:'varname'` substitution is pure clien
 
 ## Application tests
 
-Vitest + React Testing Library are set up (`pnpm test`), covering validation schemas, date-arithmetic edge cases, and the OCR text-parsing regexes -- see `docs/STATUS.md` for the current count. Playwright E2E is not set up yet; tracked in `docs/STATUS.md`'s Next list.
+Vitest + React Testing Library are set up (`pnpm test`), covering validation schemas, date-arithmetic edge cases, and the OCR text-parsing regexes -- see `docs/STATUS.md` for the current count.
+
+## End-to-end (Playwright)
+
+`e2e/` covers the critical flows this app can't afford to have silently break, driven through a real Chromium browser against a real `next build` + `next start` (not `next dev` -- see `playwright.config.ts`'s comment on why, and Issues #6/#8/#14/#15 in `docs/STATUS.md`):
+
+- `auth-and-onboarding.spec.ts` -- sign up, confirm by email (fetched from Mailpit's REST API, see `e2e/helpers.ts`), onboard, log out, log back in.
+- `property-crud.spec.ts` -- add, edit, and delete a property.
+- `tenant-isolation.spec.ts` -- the UI-level companion to `rls_smoke_test.sql` above: two independently signed-up users, User B hits User A's property URL directly and gets a clean 404. RLS proves the database rejects it; this proves the actual request -- routing, auth cookies, everything -- comes back clean too.
+
+Run locally:
+
+```bash
+supabase start
+cp .env.example .env.local   # fill in the local stack's URL/key (see supabase start's own output)
+pnpm exec playwright install --with-deps chromium   # once
+pnpm test:e2e
+supabase db reset            # clean up the users these tests create
+```
+
+Runs automatically in CI (`e2e` job in `.github/workflows/ci.yml`), which spins up the local stack the same way `rls-smoke-test` does and points the app at it by exporting the stack's dynamically-assigned URL/key into `$GITHUB_ENV` (a `.env.local` file wouldn't win here -- Next's dotenv loader never overrides a variable the environment already has, and the workflow's placeholder `env:` block sets one first).
+
+Two non-obvious things found while writing this suite, documented so they aren't rediscovered the hard way:
+
+1. **Local Supabase ships with `enable_confirmations = false`** (the CLI's own scaffold default) -- signups get an immediate session with no email step at all, silently skipping the exact code path (`src/app/auth/confirm/route.ts`) these tests exist to cover. Flipped to `true` in `supabase/config.toml` so local dev matches the real project's behavior.
+2. **Use `localhost`, never `127.0.0.1`, as the app's origin in local testing.** Next 16's `NextURL` unconditionally rewrites any `127.x.x.x` hostname to the literal string `"localhost"` when a route handler calls `request.nextUrl.clone()` (see `node_modules/next/dist/server/web/next-url.js`, `REGEX_LOCALHOST_HOSTNAME`) -- which the confirm route does to build its post-confirmation redirect. Starting from `127.0.0.1` means that redirect silently lands on a *different-origin* `localhost` URL that doesn't carry the `127.0.0.1`-scoped session cookie the confirm route just set, so the user bounces back to `/login` looking logged out. This has zero production impact (a real domain is never an IP literal) and never affects a human using `localhost:3010` as this project's own docs already recommend -- it only bit an earlier draft of `playwright.config.ts` that picked `127.0.0.1` as the base URL out of habit.

@@ -22,12 +22,13 @@ pnpm dev                # http://localhost:3000
 Other commands:
 
 ```bash
-pnpm test    # Vitest unit tests
-pnpm build   # production build
-pnpm lint    # ESLint
+pnpm test       # Vitest unit tests
+pnpm test:e2e   # Playwright E2E (needs the local stack running, see docs/testing/)
+pnpm build      # production build
+pnpm lint       # ESLint
 ```
 
-`supabase/tests/rls_smoke_test.sql` is a manual cross-tenant RLS isolation check -- see the comment at the top of that file for how to run it against the local stack.
+`supabase/tests/rls_smoke_test.sql` is a cross-tenant RLS isolation check, self-asserting and run automatically in CI -- see `docs/testing/README.md` for how to also run it manually against the local stack.
 
 ## Docs
 
