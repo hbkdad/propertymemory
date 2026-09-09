@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createRecord, deleteRecord } from "@/lib/actions/records";
+import { AttachmentsSection } from "@/components/attachments-section";
+import type { AttachmentWithUrl } from "@/lib/attachments";
 import type { Tables } from "@/lib/supabase/database.types";
 
 type RecordRow = Tables<"records"> & {
@@ -17,6 +19,7 @@ export function RecordsSection({
   spaces,
   assets,
   records,
+  attachmentsByRecordId,
 }: {
   propertyId: string;
   organizationId: string;
@@ -24,7 +27,9 @@ export function RecordsSection({
   spaces: Tables<"spaces">[];
   assets: Tables<"assets">[];
   records: RecordRow[];
+  attachmentsByRecordId: Map<string, AttachmentWithUrl[]>;
 }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const redirectTo = `/properties/${propertyId}`;
   const createWithIds = createRecord.bind(null, propertyId, organizationId, redirectTo);
   const [state, action, pending] = useActionState(createWithIds, undefined);
@@ -34,29 +39,51 @@ export function RecordsSection({
       <h2 className="text-lg font-semibold">History</h2>
 
       <ul className="mt-3 space-y-3">
-        {records.map((record) => (
-          <li key={record.id} className="flex items-start justify-between text-sm">
-            <div>
-              <p className="font-medium">
-                {record.title}{" "}
-                <span className="font-normal text-zinc-500">-- {record.record_types?.label}</span>
-              </p>
-              <p className="text-xs text-zinc-500">
-                {record.occurred_on}
-                {record.spaces?.name ? ` -- ${record.spaces.name}` : ""}
-                {record.assets?.name ? ` -- ${record.assets.name}` : ""}
-                {record.cost ? ` -- $${record.cost}` : ""}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => deleteRecord(record.id, redirectTo)}
-              className="text-xs text-red-600 underline"
-            >
-              Remove
-            </button>
-          </li>
-        ))}
+        {records.map((record) => {
+          const recordAttachments = attachmentsByRecordId.get(record.id) ?? [];
+          const expanded = expandedId === record.id;
+          return (
+            <li key={record.id} className="text-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-medium">
+                    {record.title}{" "}
+                    <span className="font-normal text-zinc-500">-- {record.record_types?.label}</span>
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    {record.occurred_on}
+                    {record.spaces?.name ? ` -- ${record.spaces.name}` : ""}
+                    {record.assets?.name ? ` -- ${record.assets.name}` : ""}
+                    {record.cost ? ` -- $${record.cost}` : ""}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(expanded ? null : record.id)}
+                    className="mt-1 text-xs text-zinc-500 underline"
+                  >
+                    {expanded ? "Hide attachments" : `Attachments (${recordAttachments.length})`}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => deleteRecord(record.id, redirectTo)}
+                  className="text-xs text-red-600 underline"
+                >
+                  Remove
+                </button>
+              </div>
+              {expanded && (
+                <AttachmentsSection
+                  organizationId={organizationId}
+                  ownerColumn="record_id"
+                  ownerId={record.id}
+                  redirectPath={redirectTo}
+                  attachments={recordAttachments}
+                />
+              )}
+            </li>
+          );
+        })}
         {records.length === 0 && (
           <li className="text-sm text-zinc-500">No history yet.</li>
         )}

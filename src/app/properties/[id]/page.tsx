@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
+import { getAttachmentsByOwner, getAttachmentsForOwner } from "@/lib/attachments";
 import { PropertyEditForm } from "./property-edit-form";
 import { SpacesSection } from "./spaces-section";
 import { RecordsSection } from "./records-section";
@@ -22,7 +23,6 @@ export default async function PropertyDetailPage(props: PageProps<"/properties/[
     { data: recordTypes },
     { data: records },
     { data: warranties },
-    { data: attachments },
     { data: expenses },
     { data: reminders },
   ] = await Promise.all([
@@ -37,7 +37,6 @@ export default async function PropertyDetailPage(props: PageProps<"/properties/[
       .order("occurred_on", { ascending: false }),
     // Only whole-property warranties -- asset-scoped ones show on the asset page.
     supabase.from("warranties").select("*").eq("property_id", id).is("asset_id", null).order("expires_on"),
-    supabase.from("attachments").select("*").eq("property_id", id).order("created_at"),
     supabase.from("expenses").select("*").eq("property_id", id).order("expense_date", { ascending: false }),
     supabase.from("reminders").select("*").eq("property_id", id).order("due_on"),
   ]);
@@ -46,16 +45,11 @@ export default async function PropertyDetailPage(props: PageProps<"/properties/[
     notFound();
   }
 
-  const attachmentPaths = (attachments ?? []).map((attachment) => attachment.storage_path);
-  const { data: signedUrls } =
-    attachmentPaths.length > 0
-      ? await supabase.storage.from("attachments").createSignedUrls(attachmentPaths, 300)
-      : { data: [] as { path: string | null; signedUrl: string }[] };
-  const urlByPath = new Map((signedUrls ?? []).map((entry) => [entry.path, entry.signedUrl]));
-  const attachmentsWithUrls = (attachments ?? []).map((attachment) => ({
-    ...attachment,
-    url: urlByPath.get(attachment.storage_path) ?? null,
-  }));
+  const [attachmentsWithUrls, attachmentsByRecordId, attachmentsByWarrantyId] = await Promise.all([
+    getAttachmentsForOwner("property_id", property.id),
+    getAttachmentsByOwner("record_id", (records ?? []).map((record) => record.id)),
+    getAttachmentsByOwner("warranty_id", (warranties ?? []).map((warranty) => warranty.id)),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-md px-6 py-12">
@@ -105,6 +99,7 @@ export default async function PropertyDetailPage(props: PageProps<"/properties/[
         spaces={spaces ?? []}
         assets={assets ?? []}
         records={records ?? []}
+        attachmentsByRecordId={attachmentsByRecordId}
       />
 
       <WarrantiesSection
@@ -112,6 +107,7 @@ export default async function PropertyDetailPage(props: PageProps<"/properties/[
         organizationId={property.organization_id}
         assetId={null}
         warranties={warranties ?? []}
+        attachmentsByWarrantyId={attachmentsByWarrantyId}
       />
 
       <AttachmentsSection

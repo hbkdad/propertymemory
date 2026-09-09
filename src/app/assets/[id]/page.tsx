@@ -6,6 +6,7 @@ import { updateAsset } from "@/lib/actions/assets";
 import { AssetForm } from "@/components/asset-form";
 import { AttachmentsSection } from "@/components/attachments-section";
 import { WarrantiesSection } from "@/components/warranties-section";
+import { getAttachmentsByOwner, getAttachmentsForOwner } from "@/lib/attachments";
 import { assetUrl, generateQrSvg } from "@/lib/qr";
 import { AssetDeleteButton } from "./asset-delete-button";
 
@@ -20,24 +21,16 @@ export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) 
     notFound();
   }
 
-  const [{ data: categories }, { data: spaces }, { data: attachments }, { data: warranties }] =
-    await Promise.all([
-      supabase.from("asset_categories").select("*").order("label"),
-      supabase.from("spaces").select("*").eq("property_id", asset.property_id).order("name"),
-      supabase.from("attachments").select("*").eq("asset_id", asset.id).order("created_at"),
-      supabase.from("warranties").select("*").eq("asset_id", asset.id).order("expires_on"),
-    ]);
+  const [{ data: categories }, { data: spaces }, { data: warranties }] = await Promise.all([
+    supabase.from("asset_categories").select("*").order("label"),
+    supabase.from("spaces").select("*").eq("property_id", asset.property_id).order("name"),
+    supabase.from("warranties").select("*").eq("asset_id", asset.id).order("expires_on"),
+  ]);
 
-  const paths = (attachments ?? []).map((attachment) => attachment.storage_path);
-  const { data: signedUrls } =
-    paths.length > 0
-      ? await supabase.storage.from("attachments").createSignedUrls(paths, 300)
-      : { data: [] as { path: string | null; signedUrl: string }[] };
-  const urlByPath = new Map((signedUrls ?? []).map((entry) => [entry.path, entry.signedUrl]));
-  const attachmentsWithUrls = (attachments ?? []).map((attachment) => ({
-    ...attachment,
-    url: urlByPath.get(attachment.storage_path) ?? null,
-  }));
+  const [attachmentsWithUrls, attachmentsByWarrantyId] = await Promise.all([
+    getAttachmentsForOwner("asset_id", asset.id),
+    getAttachmentsByOwner("warranty_id", (warranties ?? []).map((warranty) => warranty.id)),
+  ]);
 
   const updateWithIds = updateAsset.bind(null, asset.id, asset.property_id);
   const redirectPath = `/assets/${asset.id}`;
@@ -74,6 +67,7 @@ export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) 
         organizationId={asset.organization_id}
         assetId={asset.id}
         warranties={warranties ?? []}
+        attachmentsByWarrantyId={attachmentsByWarrantyId}
       />
 
       <section className="mt-10">

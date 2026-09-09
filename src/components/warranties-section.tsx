@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createWarranty, deleteWarranty } from "@/lib/actions/warranties";
+import { AttachmentsSection } from "@/components/attachments-section";
+import type { AttachmentWithUrl } from "@/lib/attachments";
 import type { Tables } from "@/lib/supabase/database.types";
 
 function isExpiringSoon(expiresOn: string) {
@@ -14,12 +16,15 @@ export function WarrantiesSection({
   organizationId,
   assetId,
   warranties,
+  attachmentsByWarrantyId,
 }: {
   propertyId: string;
   organizationId: string;
   assetId: string | null;
   warranties: Tables<"warranties">[];
+  attachmentsByWarrantyId: Map<string, AttachmentWithUrl[]>;
 }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const redirectPath = assetId ? `/assets/${assetId}` : `/properties/${propertyId}`;
   const createWithIds = createWarranty.bind(null, propertyId, organizationId, assetId, redirectPath);
   const [state, action, pending] = useActionState(createWithIds, undefined);
@@ -30,23 +35,43 @@ export function WarrantiesSection({
       <ul className="mt-3 space-y-2">
         {warranties.map((warranty) => {
           const expiring = isExpiringSoon(warranty.expires_on);
+          const warrantyAttachments = attachmentsByWarrantyId.get(warranty.id) ?? [];
+          const expanded = expandedId === warranty.id;
           return (
-            <li key={warranty.id} className="flex items-start justify-between text-sm">
-              <div>
-                <p className="font-medium">{warranty.provider}</p>
-                <p className={`text-xs ${expiring ? "text-amber-600" : "text-zinc-500"}`}>
-                  Expires {warranty.expires_on}
-                  {expiring ? " -- expiring soon" : ""}
-                  {warranty.policy_number ? ` -- #${warranty.policy_number}` : ""}
-                </p>
+            <li key={warranty.id} className="text-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-medium">{warranty.provider}</p>
+                  <p className={`text-xs ${expiring ? "text-amber-600" : "text-zinc-500"}`}>
+                    Expires {warranty.expires_on}
+                    {expiring ? " -- expiring soon" : ""}
+                    {warranty.policy_number ? ` -- #${warranty.policy_number}` : ""}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(expanded ? null : warranty.id)}
+                    className="mt-1 text-xs text-zinc-500 underline"
+                  >
+                    {expanded ? "Hide attachments" : `Attachments (${warrantyAttachments.length})`}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => deleteWarranty(warranty.id, redirectPath)}
+                  className="text-xs text-red-600 underline"
+                >
+                  Remove
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => deleteWarranty(warranty.id, redirectPath)}
-                className="text-xs text-red-600 underline"
-              >
-                Remove
-              </button>
+              {expanded && (
+                <AttachmentsSection
+                  organizationId={organizationId}
+                  ownerColumn="warranty_id"
+                  ownerId={warranty.id}
+                  redirectPath={redirectPath}
+                  attachments={warrantyAttachments}
+                />
+              )}
             </li>
           );
         })}

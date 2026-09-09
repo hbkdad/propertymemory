@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-08 (release assessment — see bottom of this file)
+Last updated: 2026-09-08 (attachments extended to records and warranties)
 
 ## Completed
 
@@ -19,7 +19,7 @@ Last updated: 2026-09-08 (release assessment — see bottom of this file)
 - Spaces — nested on the property page, `src/app/properties/[id]/spaces-section.tsx`, `src/lib/actions/spaces.ts`. Units intentionally not built yet (schema supports them; spaces attach directly to the property for now — covers the primary homeowner persona, landlord-specific units UI deferred not designed away)
 - Assets — `src/app/properties/[id]/assets/new/`, `src/app/assets/[id]/`, `src/lib/actions/assets.ts`, shared `src/components/asset-form.tsx`
 - Records (the flexible timeline entity, ADR 0005) — `src/app/properties/[id]/records-section.tsx`, `src/lib/actions/records.ts`. A single "Attached to" selector maps to `space_id` XOR `asset_id` server-side (`parseScope`), matching the DB's `records_single_scope` check constraint by construction
-- Attachments (Supabase Storage) — `src/components/attachments-section.tsx`, `src/lib/actions/attachments.ts`, wired to both properties and assets via one `ownerColumn` parameter (records/warranties not wired yet). Upload runs in a server action (Files arrive via native FormData support), validated against a MIME allow-list and the 25MB cap before touching Storage; `next.config.ts` raises the server-action body limit to 26MB. Viewing uses signed URLs (private bucket)
+- Attachments (Supabase Storage) — `src/components/attachments-section.tsx`, `src/lib/actions/attachments.ts`, wired to properties, assets, records, and warranties (every owner column the schema supports) via one `ownerColumn` parameter. Upload runs in a server action (Files arrive via native FormData support), validated against a MIME allow-list and the 25MB cap before touching Storage; `next.config.ts` raises the server-action body limit to 26MB. Viewing uses signed URLs (private bucket). Records and warranties show attachments behind a per-item "Attachments (n)" toggle rather than always-expanded, since a property can have many of either -- `src/lib/attachments.ts` batches one signed-URL call across every record/warranty on the page (grouped into a `Map` by owner id) instead of one call per item
 - Warranties — `src/components/warranties-section.tsx`, `src/lib/actions/warranties.ts`, shown on both property (whole-property, `asset_id is null`) and asset pages (one component, `assetId` prop picks the mode). Flags anything expiring within 60 days
 - Expenses — `src/components/expenses-section.tsx`, `src/lib/actions/expenses.ts`, with a running total per property
 - Reminders — `src/components/reminders-section.tsx`, `src/lib/actions/reminders.ts`, `src/lib/validations/reminder.ts`. One-time reminders go inactive on completion; recurring ones roll `due_on` forward and stay active. Overdue ones are flagged
@@ -97,18 +97,18 @@ Building this surfaced a new, distinct flavor of Turbopack dev-mode staleness (I
 
 With docs done, every item from "marketing site → docs → CI/CD" in the roadmap's execution order is complete.
 
+**Attachments on records and warranties** (added after the release assessment below, which predates this) — the last remaining gap from the original attachments work: `attachments.record_id`/`warranty_id` already existed in the schema with RLS already covering them table-wide, so this was UI wiring, not new authorization surface. Each record and warranty in the list now has an "Attachments (n)" toggle that reveals a full upload/view/delete section scoped to that specific row. `getAttachmentsByOwner()`/`getAttachmentsForOwner()` (`src/lib/attachments.ts`) replaced four copies of the same inline signed-URL-batching logic across the property and asset pages -- a real fourth use case, not speculative extraction. Live-verified end to end: uploaded a file to a record (landed with `record_id` set, `warranty_id` null), to a property-level warranty, and to an asset-level warranty (the second `WarrantiesSection` call site) -- all three confirmed by querying the raw `attachments` rows, not just trusting the UI. Checked at 390px and 768px widths per the accessibility/responsive-design rule in `CLAUDE.md`; no clipping or overflow at either.
+
 ## Next
 
-1. **Release assessment** -- the last phase in the roadmap's execution order, now that the MVP feature set, security testing, QA, performance, and marketing/docs/CI are all done. An honest go/no-go pass: what's genuinely launch-ready, what's a known gap, what's explicitly out of scope.
-2. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
-3. Promoting `rls_smoke_test.sql` from a manual script into the CI workflow itself -- needs the local Supabase stack spun up inside the GitHub Actions runner (the CLI supports this, but it's a heavier, separate piece of work from the build/test job added this round) and ideally rewriting its `\echo`-commented expectations into real programmatic assertions that fail the run on a mismatch, not just print for a human to read.
-4. A full script/style-restricting CSP (nonce-based, via `proxy.ts`), if/when there's a stronger reason to invest in it -- deliberately deferred, see Security testing above.
-5. Real rate limiting on the OCR endpoint if usage ever justifies the cost of a shared store (Redis/Upstash) -- not solvable for $0 today, see Security testing above.
-6. Extend attachments to records/warranties too (property and asset already covered; the action already supports any owner column).
-7. A dashboard widget surfacing expiring warranties / upcoming reminders across all of a user's properties (currently per-property view only).
-8. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
-9. Playwright E2E setup.
-10. Real device/touch testing for the PWA -- this round's mobile QA was viewport-emulation only.
+1. **Before deploying**: configure the real Supabase project's Auth → URL Configuration (site URL, redirect URLs) and Auth → Email Templates (confirmation, recovery) via the dashboard to match `supabase/config.toml`/`supabase/templates/` — no MCP tool covers this, and it can't be verified without a real domain.
+2. Promoting `rls_smoke_test.sql` from a manual script into the CI workflow itself -- needs the local Supabase stack spun up inside the GitHub Actions runner (the CLI supports this, but it's a heavier, separate piece of work from the build/test job added this round) and ideally rewriting its `\echo`-commented expectations into real programmatic assertions that fail the run on a mismatch, not just print for a human to read.
+3. A full script/style-restricting CSP (nonce-based, via `proxy.ts`), if/when there's a stronger reason to invest in it -- deliberately deferred, see Security testing above.
+4. Real rate limiting on the OCR endpoint if usage ever justifies the cost of a shared store (Redis/Upstash) -- not solvable for $0 today, see Security testing above.
+5. A dashboard widget surfacing expiring warranties / upcoming reminders across all of a user's properties (currently per-property view only).
+6. Units UI, if/when a landlord-focused push warrants it (schema already supports it).
+7. Playwright E2E setup.
+8. Real device/touch testing for the PWA -- this round's mobile QA was viewport-emulation only.
 
 ## Blockers
 
