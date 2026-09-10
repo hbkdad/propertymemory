@@ -17,7 +17,7 @@ export function SpacesSection({
   const [state, action, pending] = useActionState(createWithIds, undefined);
 
   return (
-    <section className="mt-10">
+    <section id="spaces" className="mt-10">
       <h2 className="text-lg font-semibold">Spaces</h2>
       <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
         {spaces.map((space) => (

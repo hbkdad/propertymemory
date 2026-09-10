@@ -10,10 +10,10 @@
 --   docker exec -i supabase_db_property psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/rls_smoke_test.sql
 --   supabase db reset   # clean up afterwards
 --
--- Covers properties, assets, and extraction_jobs as representative examples
--- of the same organization_id-based policy pattern (ADR 0002) used on all 20
--- tables -- not exhaustive over every table, but exercises select/insert/
--- update/delete isolation, not just select.
+-- Covers properties, assets, extraction_jobs, and visual_annotations as
+-- representative examples of the same organization_id-based policy pattern
+-- (ADR 0002) used on every table -- not exhaustive over every table, but
+-- exercises select/insert/update/delete isolation, not just select.
 --
 -- NOTE: psql's `:'varname'` substitution is pure client-side text
 -- replacement and does NOT reach inside a `DO $$ ... $$` block (dollar-
@@ -52,12 +52,16 @@ select * from create_organization('Org A') \gset org_a_
 insert into properties (organization_id, name, created_by) values (:'org_a_id', '12 Main Street', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') returning id \gset org_a_property_
 insert into assets (organization_id, property_id, name, created_by) values (:'org_a_id', :'org_a_property_id', 'Furnace', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') returning id \gset org_a_asset_
 insert into extraction_jobs (organization_id, kind, status, provider, created_by) values (:'org_a_id', 'appliance_label', 'completed', 'tesseract', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+insert into attachments (organization_id, property_id, role, is_cover, storage_path, file_name, mime_type, size_bytes, uploaded_by) values (:'org_a_id', :'org_a_property_id', 'photo', true, 'org-a/kitchen.jpg', 'kitchen.jpg', 'image/jpeg', 12345, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') returning id \gset org_a_attachment_
+insert into visual_annotations (organization_id, attachment_id, asset_id, annotation_type, coordinates, label, created_by) values (:'org_a_id', :'org_a_attachment_id', :'org_a_asset_id', 'rectangle', '{"x":0.1,"y":0.1,"w":0.2,"h":0.2}', 'North Wall', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') returning id \gset org_a_annotation_
 
 -- Bridge the psql-side ids into Postgres session variables so later DO
 -- blocks can read them via current_setting() -- see note above.
 select set_config('rls_test.org_a_id', :'org_a_id', false);
 select set_config('rls_test.org_a_property_id', :'org_a_property_id', false);
 select set_config('rls_test.org_a_asset_id', :'org_a_asset_id', false);
+select set_config('rls_test.org_a_attachment_id', :'org_a_attachment_id', false);
+select set_config('rls_test.org_a_annotation_id', :'org_a_annotation_id', false);
 
 do $$
 declare
@@ -66,6 +70,7 @@ begin
   select count(*) into cnt from organizations; if cnt <> 1 then raise exception 'User A should see exactly 1 org, got %', cnt; end if;
   select count(*) into cnt from properties; if cnt <> 1 then raise exception 'User A should see exactly 1 property, got %', cnt; end if;
   select count(*) into cnt from assets; if cnt <> 1 then raise exception 'User A should see exactly 1 asset, got %', cnt; end if;
+  select count(*) into cnt from visual_annotations; if cnt <> 1 then raise exception 'User A should see exactly 1 visual annotation, got %', cnt; end if;
 end $$;
 
 reset role;
@@ -85,6 +90,7 @@ begin
   select count(*) into cnt from properties; if cnt <> 0 then raise exception 'SECURITY REGRESSION: User B can see % of Org A''s properties', cnt; end if;
   select count(*) into cnt from assets; if cnt <> 0 then raise exception 'SECURITY REGRESSION: User B can see % of Org A''s assets', cnt; end if;
   select count(*) into cnt from extraction_jobs; if cnt <> 0 then raise exception 'SECURITY REGRESSION: User B can see % of Org A''s extraction jobs', cnt; end if;
+  select count(*) into cnt from visual_annotations; if cnt <> 0 then raise exception 'SECURITY REGRESSION: User B can see % of Org A''s visual annotations', cnt; end if;
   select count(*) into cnt from organizations where id = org_a_id;
   if cnt <> 0 then raise exception 'SECURITY REGRESSION: User B can read Org A by guessing its id'; end if;
 end $$;
@@ -131,6 +137,36 @@ begin
   end if;
 end $$;
 
+do $$
+declare
+  org_a_id uuid := current_setting('rls_test.org_a_id')::uuid;
+  org_a_attachment_id uuid := current_setting('rls_test.org_a_attachment_id')::uuid;
+begin
+  insert into visual_annotations (organization_id, attachment_id, annotation_type, coordinates, label, created_by)
+    values (org_a_id, org_a_attachment_id, 'point', '{"x":0.5,"y":0.5}', 'Malicious pin', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+  raise exception 'SECURITY REGRESSION: User B inserted a visual annotation onto Org A''s photo';
+exception
+  when insufficient_privilege then null; -- expected: RLS blocked it
+end $$;
+
+do $$
+declare
+  org_a_annotation_id uuid := current_setting('rls_test.org_a_annotation_id')::uuid;
+  affected int;
+begin
+  update visual_annotations set label = 'Renamed by attacker' where id = org_a_annotation_id;
+  get diagnostics affected = row_count;
+  if affected <> 0 then
+    raise exception 'SECURITY REGRESSION: User B updated % row(s) of Org A''s visual annotation', affected;
+  end if;
+
+  delete from visual_annotations where id = org_a_annotation_id;
+  get diagnostics affected = row_count;
+  if affected <> 0 then
+    raise exception 'SECURITY REGRESSION: User B deleted % row(s) of Org A''s visual annotation', affected;
+  end if;
+end $$;
+
 reset role;
 
 do $$
@@ -155,6 +191,14 @@ begin
   end if;
   if (select count(*) from assets) <> 1 then
     raise exception 'ground truth check failed: expected exactly 1 asset, got %', (select count(*) from assets);
+  end if;
+
+  select * into r from visual_annotations limit 2;
+  if not found or r.label <> 'North Wall' or r.organization_id <> org_a_id then
+    raise exception 'ground truth check failed: visual_annotations table is not exactly as User A left it';
+  end if;
+  if (select count(*) from visual_annotations) <> 1 then
+    raise exception 'ground truth check failed: expected exactly 1 visual annotation, got %', (select count(*) from visual_annotations);
   end if;
 end $$;
 

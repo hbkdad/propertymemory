@@ -107,14 +107,19 @@ export default async function DashboardPage() {
 
       <ul className="mt-8 divide-y divide-zinc-200 dark:divide-zinc-800">
         {properties?.map((property) => (
-          <li key={property.id} className="py-4">
-            <Link href={`/properties/${property.id}`} className="font-medium underline">
-              {property.name}
+          <li key={property.id} className="flex items-center justify-between py-4">
+            <div>
+              <Link href={`/properties/${property.id}`} className="font-medium underline">
+                {property.name}
+              </Link>
+              <p className="text-sm text-zinc-500">
+                {property.city ? `${property.city} -- ` : ""}
+                {property.property_type.replace("_", " ")}
+              </p>
+            </div>
+            <Link href={`/properties/${property.id}/visual`} className="text-sm text-zinc-500 underline">
+              Enter
             </Link>
-            <p className="text-sm text-zinc-500">
-              {property.city ? `${property.city} -- ` : ""}
-              {property.property_type.replace("_", " ")}
-            </p>
           </li>
         ))}
       </ul>

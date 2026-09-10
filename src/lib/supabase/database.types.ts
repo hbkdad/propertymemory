@@ -163,43 +163,58 @@ export type Database = {
           asset_id: string | null
           created_at: string
           file_name: string
+          height_px: number | null
           id: string
+          is_cover: boolean
           mime_type: string
           organization_id: string
           property_id: string | null
           record_id: string | null
+          role: string
           size_bytes: number
+          space_id: string | null
           storage_path: string
           uploaded_by: string
           warranty_id: string | null
+          width_px: number | null
         }
         Insert: {
           asset_id?: string | null
           created_at?: string
           file_name: string
+          height_px?: number | null
           id?: string
+          is_cover?: boolean
           mime_type: string
           organization_id: string
           property_id?: string | null
           record_id?: string | null
+          role?: string
           size_bytes: number
+          space_id?: string | null
           storage_path: string
           uploaded_by: string
           warranty_id?: string | null
+          width_px?: number | null
         }
         Update: {
           asset_id?: string | null
           created_at?: string
           file_name?: string
+          height_px?: number | null
           id?: string
+          is_cover?: boolean
           mime_type?: string
           organization_id?: string
           property_id?: string | null
           record_id?: string | null
+          role?: string
           size_bytes?: number
+          space_id?: string | null
           storage_path?: string
           uploaded_by?: string
           warranty_id?: string | null
+          width_px?: number | null
         }
         Relationships: [
           {
@@ -228,6 +243,13 @@ export type Database = {
             columns: ["record_id"]
             isOneToOne: false
             referencedRelation: "records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
             referencedColumns: ["id"]
           },
           {
@@ -1082,6 +1104,67 @@ export type Database = {
           },
         ]
       }
+      visual_annotations: {
+        Row: {
+          annotation_type: string
+          asset_id: string | null
+          attachment_id: string
+          coordinates: Json
+          created_at: string
+          created_by: string
+          id: string
+          label: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          annotation_type: string
+          asset_id?: string | null
+          attachment_id: string
+          coordinates: Json
+          created_at?: string
+          created_by: string
+          id?: string
+          label: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          annotation_type?: string
+          asset_id?: string | null
+          attachment_id?: string
+          coordinates?: Json
+          created_at?: string
+          created_by?: string
+          id?: string
+          label?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visual_annotations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visual_annotations_attachment_id_fkey"
+            columns: ["attachment_id"]
+            isOneToOne: false
+            referencedRelation: "attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visual_annotations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warranties: {
         Row: {
           asset_id: string | null
@@ -1175,8 +1258,6 @@ export type Database = {
       }
       is_org_admin: { Args: { target_org_id: string }; Returns: boolean }
       is_org_member: { Args: { target_org_id: string }; Returns: boolean }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never

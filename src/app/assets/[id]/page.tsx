@@ -21,10 +21,11 @@ export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) 
     notFound();
   }
 
-  const [{ data: categories }, { data: spaces }, { data: warranties }] = await Promise.all([
+  const [{ data: categories }, { data: spaces }, { data: warranties }, { data: vendors }] = await Promise.all([
     supabase.from("asset_categories").select("*").order("label"),
     supabase.from("spaces").select("*").eq("property_id", asset.property_id).order("name"),
     supabase.from("warranties").select("*").eq("asset_id", asset.id).order("expires_on"),
+    supabase.from("vendors").select("*").order("name"),
   ]);
 
   const [attachmentsWithUrls, attachmentsByWarrantyId] = await Promise.all([
@@ -49,6 +50,7 @@ export default async function AssetDetailPage(props: PageProps<"/assets/[id]">) 
         propertyId={asset.property_id}
         categories={categories ?? []}
         spaces={spaces ?? []}
+        vendors={vendors ?? []}
         initial={asset}
         submitLabel="Save changes"
       />

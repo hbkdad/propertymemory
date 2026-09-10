@@ -9,5 +9,7 @@ export const assetSchema = z.object({
   serialNumber: z.string().trim().optional(),
   installedOn: z.string().trim().optional(),
   purchasedOn: z.string().trim().optional(),
+  purchasePrice: z.coerce.number().positive().optional(),
+  vendorId: z.string().trim().optional(),
   notes: z.string().trim().optional(),
 });

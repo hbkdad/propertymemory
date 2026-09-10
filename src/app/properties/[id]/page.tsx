@@ -53,9 +53,14 @@ export default async function PropertyDetailPage(props: PageProps<"/properties/[
 
   return (
     <div className="mx-auto w-full max-w-md px-6 py-12">
-      <Link href="/dashboard" className="text-sm text-zinc-500 underline">
-        Back to properties
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/dashboard" className="text-sm text-zinc-500 underline">
+          Back to properties
+        </Link>
+        <Link href={`/properties/${property.id}/visual`} className="text-sm underline">
+          Visual view
+        </Link>
+      </div>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight">{property.name}</h1>
       <PropertyEditForm property={property} />
 

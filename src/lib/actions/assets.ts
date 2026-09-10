@@ -20,6 +20,8 @@ function parseAssetForm(formData: FormData) {
     serialNumber: formData.get("serialNumber") || undefined,
     installedOn: formData.get("installedOn") || undefined,
     purchasedOn: formData.get("purchasedOn") || undefined,
+    purchasePrice: formData.get("purchasePrice") || undefined,
+    vendorId: formData.get("vendorId") || undefined,
     notes: formData.get("notes") || undefined,
   });
 }
@@ -49,6 +51,8 @@ export async function createAsset(
     serial_number: validated.data.serialNumber,
     installed_on: validated.data.installedOn || null,
     purchased_on: validated.data.purchasedOn || null,
+    purchase_price: validated.data.purchasePrice ?? null,
+    vendor_id: validated.data.vendorId || null,
     notes: validated.data.notes,
     created_by: claims.sub as string,
   });
@@ -86,6 +90,8 @@ export async function updateAsset(
       serial_number: validated.data.serialNumber,
       installed_on: validated.data.installedOn || null,
       purchased_on: validated.data.purchasedOn || null,
+      purchase_price: validated.data.purchasePrice ?? null,
+      vendor_id: validated.data.vendorId || null,
       notes: validated.data.notes,
     })
     .eq("id", assetId);

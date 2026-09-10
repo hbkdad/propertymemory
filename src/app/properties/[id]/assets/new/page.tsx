@@ -10,10 +10,11 @@ export default async function NewAssetPage(props: PageProps<"/properties/[id]/as
   const { id } = await props.params;
 
   const supabase = await createClient();
-  const [{ data: property }, { data: categories }, { data: spaces }] = await Promise.all([
+  const [{ data: property }, { data: categories }, { data: spaces }, { data: vendors }] = await Promise.all([
     supabase.from("properties").select("id, organization_id, name").eq("id", id).maybeSingle(),
     supabase.from("asset_categories").select("*").order("label"),
     supabase.from("spaces").select("*").eq("property_id", id).order("name"),
+    supabase.from("vendors").select("*").order("name"),
   ]);
 
   if (!property) {
@@ -34,6 +35,7 @@ export default async function NewAssetPage(props: PageProps<"/properties/[id]/as
         propertyId={property.id}
         categories={categories ?? []}
         spaces={spaces ?? []}
+        vendors={vendors ?? []}
         submitLabel="Add asset"
       />
     </div>

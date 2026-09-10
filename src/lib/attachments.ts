@@ -11,6 +11,7 @@ export type AttachmentWithUrl = Tables<"attachments"> & { url: string | null };
 export async function getAttachmentsByOwner(
   ownerColumn: AttachmentOwnerColumn,
   ownerIds: string[],
+  role: "document" | "photo" = "document",
 ): Promise<Map<string, AttachmentWithUrl[]>> {
   const map = new Map<string, AttachmentWithUrl[]>();
   if (ownerIds.length === 0) return map;
@@ -20,6 +21,7 @@ export async function getAttachmentsByOwner(
     .from("attachments")
     .select("*")
     .in(ownerColumn, ownerIds)
+    .eq("role", role)
     .order("created_at");
 
   const paths = (attachments ?? []).map((attachment) => attachment.storage_path);
@@ -47,7 +49,8 @@ export async function getAttachmentsByOwner(
 export async function getAttachmentsForOwner(
   ownerColumn: AttachmentOwnerColumn,
   ownerId: string,
+  role: "document" | "photo" = "document",
 ): Promise<AttachmentWithUrl[]> {
-  const map = await getAttachmentsByOwner(ownerColumn, [ownerId]);
+  const map = await getAttachmentsByOwner(ownerColumn, [ownerId], role);
   return map.get(ownerId) ?? [];
 }

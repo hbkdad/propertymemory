@@ -10,4 +10,4 @@ export const ALLOWED_ATTACHMENT_TYPES = new Set([
   "application/pdf",
 ]);
 
-export type AttachmentOwnerColumn = "property_id" | "asset_id" | "record_id" | "warranty_id";
+export type AttachmentOwnerColumn = "property_id" | "asset_id" | "record_id" | "warranty_id" | "space_id";

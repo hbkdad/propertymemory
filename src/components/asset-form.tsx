@@ -15,6 +15,7 @@ export function AssetForm({
   propertyId,
   categories,
   spaces,
+  vendors,
   initial,
   submitLabel,
 }: {
@@ -23,6 +24,7 @@ export function AssetForm({
   propertyId: string;
   categories: Tables<"asset_categories">[];
   spaces: Tables<"spaces">[];
+  vendors: Tables<"vendors">[];
   initial?: Tables<"assets">;
   submitLabel: string;
 }) {
@@ -163,6 +165,41 @@ export function AssetForm({
             defaultValue={initial?.purchased_on ?? ""}
             className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label htmlFor="purchasePrice" className="text-sm font-medium">
+            Cost
+          </label>
+          <input
+            id="purchasePrice"
+            name="purchasePrice"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={initial?.purchase_price ?? ""}
+            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="vendorId" className="text-sm font-medium">
+            Purchased from
+          </label>
+          <select
+            id="vendorId"
+            name="vendorId"
+            defaultValue={initial?.vendor_id ?? ""}
+            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            <option value="">--</option>
+            {vendors.map((vendor) => (
+              <option key={vendor.id} value={vendor.id}>
+                {vendor.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

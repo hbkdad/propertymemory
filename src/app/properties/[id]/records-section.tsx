@@ -35,7 +35,7 @@ export function RecordsSection({
   const [state, action, pending] = useActionState(createWithIds, undefined);
 
   return (
-    <section className="mt-10">
+    <section id="records" className="mt-10">
       <h2 className="text-lg font-semibold">History</h2>
 
       <ul className="mt-3 space-y-3">
