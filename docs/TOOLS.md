@@ -23,7 +23,30 @@ Tracks every external tool/MCP server/package added to this project beyond the l
 
 ## Added during development
 
-_None yet. Entries will be appended here as dependencies are introduced, in the form:_
+_Entries below were backfilled on 2026-09-10 while auditing this file for the visual-mode phase -- they should have been logged when each package was actually added (smart capture / export / QR phases) rather than after the fact. Recorded here now so the log is accurate going forward; treat the "Added" date as when each package first shipped, not when it was written up._
+
+### tesseract.js / tesseract.js-core
+- Added: 2026-09-08, smart capture (OCR) phase
+- Problem it solves: free/local text extraction from appliance-label and receipt photos, satisfying ADR 0004's requirement that the app work fully with zero paid AI keys configured.
+- Alternatives considered: a paid cloud OCR API (Google Vision, AWS Textract) -- rejected as the *default*, since it would violate the zero-capital constraint; the `ExtractionProvider` interface leaves room for one later as an optional, non-mandatory upgrade.
+- License / cost tier: Apache-2.0, free, runs entirely server-side (no client bundle cost -- confirmed via a chunk-grep during the performance-optimization phase, see `docs/STATUS.md`).
+- Footprint: needed `serverExternalPackages` in `next.config.ts` (see `docs/STATUS.md` Issue #9) since it resolves a worker script via a real filesystem path that bundlers otherwise rewrite incorrectly.
+
+### @react-pdf/renderer
+- Added: 2026-09-08, export phase
+- Problem it solves: generates the property PDF report (assets/history/warranties/expenses) server-side, without a headless-browser dependency (Puppeteer et al., which would need more memory/compute than a $0 hosting tier comfortably provides).
+- Alternatives considered: server-side Puppeteer/Playwright PDF generation -- rejected as heavier and less suited to a serverless/edge-friendly deploy target.
+- License / cost tier: MIT, free.
+- Footprint: server-only usage (the export route handlers), confirmed absent from the client bundle in the same chunk-grep as above.
+
+### qrcode
+- Added: 2026-09-08, QR asset identifiers phase
+- Problem it solves: generates the QR code + printable label linking a physical asset to its `/assets/[id]` page.
+- Alternatives considered: none seriously -- this is a narrow, well-solved problem where a small, focused library beats hand-rolling QR encoding.
+- License / cost tier: MIT, free.
+- Footprint: its SVG renderer was specifically traced (not just grepped) during the security-testing phase to confirm it never writes the encoded URL as literal markup, so there's no XSS path through `dangerouslySetInnerHTML` regardless of what the URL contains (see `docs/STATUS.md` Security testing section).
+
+_Further entries will be appended here as new dependencies are introduced, in the form:_
 
 ```
 ### <package/tool name>
