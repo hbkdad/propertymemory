@@ -77,6 +77,50 @@ export function RoomStageViewer({
     setDraft(null);
   }
 
+  // Keyboard-only path for placing a hotspot, since dragging a box has no
+  // pointer equivalent otherwise (CLAUDE.md/Section 51: every interactive
+  // control needs a keyboard route, "hotspot navigation where practical").
+  // Enter/Space drops a default-sized box roughly in the middle of the
+  // photo; arrow keys nudge it, Shift+arrow resizes it, before it's saved
+  // through the same label/asset form the mouse path uses.
+  const NUDGE = 0.02;
+  const MIN_SIZE = 0.04;
+  function handleStageKeyDown(event: React.KeyboardEvent) {
+    if (!isPlacing) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelPlacing();
+      return;
+    }
+    if (!draft && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      setDraft({ type: "rectangle", x: 0.4, y: 0.4, w: 0.2, h: 0.2 });
+      return;
+    }
+    if (draft && draft.type === "rectangle" && event.key.startsWith("Arrow")) {
+      event.preventDefault();
+      setDraft((prev) => {
+        if (!prev || prev.type !== "rectangle") return prev;
+        if (event.shiftKey) {
+          const grow = event.key === "ArrowRight" || event.key === "ArrowDown" ? NUDGE : -NUDGE;
+          if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+            const w = Math.min(1 - prev.x, Math.max(MIN_SIZE, prev.w + grow));
+            return { ...prev, w };
+          }
+          const h = Math.min(1 - prev.y, Math.max(MIN_SIZE, prev.h + grow));
+          return { ...prev, h };
+        }
+        const dx = event.key === "ArrowLeft" ? -NUDGE : event.key === "ArrowRight" ? NUDGE : 0;
+        const dy = event.key === "ArrowUp" ? -NUDGE : event.key === "ArrowDown" ? NUDGE : 0;
+        return {
+          ...prev,
+          x: Math.min(1 - prev.w, Math.max(0, prev.x + dx)),
+          y: Math.min(1 - prev.h, Math.max(0, prev.y + dy)),
+        };
+      });
+    }
+  }
+
   async function saveHotspot(formData: FormData) {
     if (!draft || !photo) return;
     const label = String(formData.get("label") ?? "").trim();
@@ -188,11 +232,21 @@ export function RoomStageViewer({
         <div className="relative">
           <div
             ref={stageRef}
-            className={`relative mx-auto ${isPlacing ? "cursor-crosshair" : ""}`}
+            className={`relative mx-auto ${isPlacing ? "cursor-crosshair outline-none focus-visible:ring-4 focus-visible:ring-amber-400/60" : ""}`}
             style={{ aspectRatio: photo.width && photo.height ? `${photo.width} / ${photo.height}` : "16 / 9" }}
             onMouseDown={handleStageMouseDown}
             onMouseMove={handleStageMouseMove}
             onMouseUp={handleStageMouseUp}
+            onKeyDown={handleStageKeyDown}
+            tabIndex={isPlacing ? 0 : undefined}
+            role={isPlacing ? "application" : undefined}
+            aria-label={
+              isPlacing
+                ? "Photo of " +
+                  space.name +
+                  ". Press Enter to place a hotspot, arrow keys to move it, Shift plus arrow keys to resize it, Escape to cancel."
+                : undefined
+            }
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- see docs/decisions/0006 */}
             <img src={photo.url} alt={`${space.name} photo`} className="h-full w-full select-none object-contain" draggable={false} />
@@ -252,7 +306,9 @@ export function RoomStageViewer({
             <div className="flex flex-wrap gap-2">
               {isPlacing ? (
                 <>
-                  <span className="rounded-md bg-white/10 px-3 py-1.5">Click, or drag a box, on the photo</span>
+                  <span className="rounded-md bg-white/10 px-3 py-1.5">
+                    Click, or drag a box, on the photo -- or press Enter on it to place one, arrow keys to move it
+                  </span>
                   <button type="button" onClick={cancelPlacing} className="rounded-md bg-white/10 px-3 py-1.5">
                     Cancel
                   </button>
@@ -260,7 +316,13 @@ export function RoomStageViewer({
               ) : (
                 <button
                   type="button"
-                  onClick={() => setIsPlacing(true)}
+                  onClick={() => {
+                    setIsPlacing(true);
+                    // Send keyboard users straight to the one control that
+                    // now does something (the photo itself) instead of
+                    // leaving focus on a button that just disappeared.
+                    requestAnimationFrame(() => stageRef.current?.focus());
+                  }}
                   className="rounded-md bg-white px-3 py-1.5 font-medium text-zinc-900"
                 >
                   + Add hotspot
@@ -318,7 +380,6 @@ export function RoomStageViewer({
             <input
               name="label"
               required
-              autoFocus
               placeholder="e.g. North Wall"
               className="mt-1 w-full rounded-md border border-white/20 bg-white/5 px-2 py-1.5 text-white"
             />
